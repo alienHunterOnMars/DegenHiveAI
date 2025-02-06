@@ -1,10 +1,10 @@
-import { type Client, elizaLogger, type IAgentRuntime } from "@elizaos/core";
-import { ClientBase } from "./base.ts";
-import { validateTwitterConfig, type TwitterConfig } from "./environment.ts";
-import { TwitterInteractionClient } from "./interactions.ts";
-import { TwitterPostClient } from "./post.ts";
-import { TwitterSearchClient } from "./search.ts";
-import { TwitterSpaceClient } from "./spaces.ts";
+import { type Client, elizaLogger, type IAgentRuntime } from "@hiveai/core";
+import { ClientBase } from "./base";
+import { validateTwitterConfig, type TwitterConfig } from "./environment";
+import { TwitterInteractionClient } from "./interactions";
+import { TwitterPostClient } from "./post";
+import { TwitterSearchClient } from "./search";
+import { TwitterSpaceClient } from "./spaces";
 import { EventEmitter } from 'events';
 import { Logger } from '@hiveai/utils';
 

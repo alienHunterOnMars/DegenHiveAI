@@ -5,7 +5,7 @@
  */
 import { Telegraf, Context } from "telegraf";
 import { MessageManager } from "./messageManager";
-import { Logger } from "../../utils/logger";
+import { Logger } from "@hiveai/utils";
 import { IUserManager } from "./userManager";
 import { ITradeManager } from "./tradeManager";
 import { IRLManager } from "./rlManager";

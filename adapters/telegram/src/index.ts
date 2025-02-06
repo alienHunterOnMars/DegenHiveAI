@@ -11,7 +11,7 @@ import { UserManager } from "./userManager";
 import { TradeManager } from "./tradeManager";
 import { RLManager } from "./rlManager";
 import { MemoryManager } from "./memoryManager";
-import { Logger } from "./utils/logger"; // Assume a simple Logger module exists
+import { Logger } from "@hiveai/utils";
 import { EventEmitter } from 'events';
 
 export interface TelegramConfig {
