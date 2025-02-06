@@ -1,5 +1,5 @@
 {
-	"name": "@elizaos/client-twitter",
+	"name": "@hiveAI/adapters-twitter",
 	"version": "0.1.9",
 	"type": "module",
 	"main": "dist/index.js",
@@ -9,7 +9,7 @@
 		"./package.json": "./package.json",
 		".": {
 			"import": {
-				"@elizaos/source": "./src/index.ts",
+				"@hiveAI/source": "./src/index.ts",
 				"types": "./dist/index.d.ts",
 				"default": "./dist/index.js"
 			}
@@ -19,7 +19,6 @@
 		"dist"
 	],
 	"dependencies": {
-		"@elizaos/core": "workspace:*",
 		"agent-twitter-client": "0.0.18",
 		"discord.js": "14.16.3",
 		"glob": "11.0.0",

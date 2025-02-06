@@ -1,0 +1,5 @@
+packages:
+  - 'adapters/*'
+  - 'services/*'
+  - 'core'
+  - 'utils' 

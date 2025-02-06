@@ -1,5 +1,5 @@
 {
-	"name": "@elizaos/client-farcaster",
+	"name": "@hiveAI/adapters-farcaster",
 	"version": "0.1.9",
 	"type": "module",
 	"main": "dist/index.js",
@@ -9,7 +9,7 @@
 		"./package.json": "./package.json",
 		".": {
 			"import": {
-				"@elizaos/source": "./src/index.ts",
+				"@hiveAI/source": "./src/index.ts",
 				"types": "./dist/index.d.ts",
 				"default": "./dist/index.js"
 			}
@@ -19,7 +19,6 @@
 		"dist"
 	],
 	"dependencies": {
-		"@elizaos/core": "workspace:*",
 		"@neynar/nodejs-sdk": "^2.0.3"
 	},
 	"devDependencies": {

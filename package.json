@@ -1,0 +1,40 @@
+{
+    "name": "hive-ai-swarm",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "scripts": {
+        "build": "turbo run build",
+        "dev": "turbo run dev",
+        "test": "turbo run test",
+        "lint": "eslint .",
+        "start": "tsx start_hive_swarm.ts",
+        "start:prod": "node dist/start_hive_swarm.js"
+    },
+    "dependencies": {
+        "@hiveai/adapters-discord": "workspace:*",
+        "@hiveai/adapters-reddit": "workspace:*",
+        "@hiveai/utils": "workspace:*",
+        "dotenv": "^16.3.1",
+        "node-telegram-bot-api": "^0.64.0",
+        "openai": "^4.0.0",
+        "redis": "^4.6.10",
+        "tsx": "^4.7.0",
+        "zod": "^3.22.4"
+    },
+    "devDependencies": {
+        "@types/node": "^20.0.0",
+        "@types/node-telegram-bot-api": "^0.64.0",
+        "@typescript-eslint/eslint-plugin": "^6.0.0",
+        "@typescript-eslint/parser": "^6.0.0",
+        "eslint": "^8.0.0",
+        "eslint-config-prettier": "^9.0.0",
+        "eslint-plugin-prettier": "^5.0.0",
+        "prettier": "^3.0.0",
+        "turbo": "^1.10.0",
+        "typescript": "^5.0.0"
+    },
+    "engines": {
+        "node": ">=18.0.0"
+    }
+} 
