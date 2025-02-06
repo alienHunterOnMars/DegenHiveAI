@@ -4,6 +4,8 @@ import { FarcasterPostManager } from "./post";
 import { FarcasterInteractionManager } from "./interactions";
 import { Configuration, NeynarAPIClient } from "@neynar/nodejs-sdk";
 import { validateFarcasterConfig, type FarcasterConfig } from "./environment";
+import { EventEmitter } from 'events';
+import { Logger } from '@hiveai/utils';
 
 /**
  * A manager that orchestrates all Farcaster operations:
@@ -91,3 +93,10 @@ export const FarcasterClientInterface: Client = {
 };
 
 export default FarcasterClientInterface;
+
+export class FarcasterAdapter extends EventEmitter {
+    constructor() {
+        super();
+        Logger.info('Farcaster adapter initialized');
+    }
+}

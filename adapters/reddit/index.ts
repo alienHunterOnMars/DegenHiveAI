@@ -1,10 +1,10 @@
 import Snoowrap from 'snoowrap';
 import { EventEmitter } from 'events';
 import { Logger } from '../../utils/logger';
-import { RedditMessageHandler } from './handlers/messageHandler';
+import { RedditMessageHandler } from './src/handlers/messageHandler';
 import { RedditPostHandler } from './handlers/postHandler';
 import { RedditConfig, RedditPost } from './types';
-import { TelegramAdapter } from '../telegram/telegramAdapter';
+import { TelegramAdapter } from '@hiveai/adapters-telegram';
 
 export class RedditAdapter extends EventEmitter {
     private client: Snoowrap;

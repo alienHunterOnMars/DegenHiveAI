@@ -14,6 +14,9 @@
     "dependencies": {
         "@hiveai/adapters-discord": "workspace:*",
         "@hiveai/adapters-reddit": "workspace:*",
+        "@hiveai/adapters-telegram": "workspace:*",
+        "@hiveai/adapters-twitter": "workspace:*",
+        "@hiveai/adapters-farcaster": "workspace:*",
         "@hiveai/utils": "workspace:*",
         "dotenv": "^16.3.1",
         "node-telegram-bot-api": "^0.64.0",

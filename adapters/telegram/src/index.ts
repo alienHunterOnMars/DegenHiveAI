@@ -12,7 +12,24 @@ import { TradeManager } from "./tradeManager";
 import { RLManager } from "./rlManager";
 import { MemoryManager } from "./memoryManager";
 import { Logger } from "./utils/logger"; // Assume a simple Logger module exists
+import { EventEmitter } from 'events';
 
+export interface TelegramConfig {
+    token: string;
+    founderChatId: string;
+    groupChatId: string;
+}
+
+export class TelegramAdapter extends EventEmitter {
+    constructor(config: TelegramConfig) {
+        super();
+        Logger.info('Telegram adapter initialized');
+    }
+
+    async sendFounderMessage(message: string, options?: any): Promise<any> {
+        // Implement later
+    }
+}
 async function boot() {
   try {
     Logger.info("Bootstrapping DegenHive AI Hive Swarm Telegram Client...");

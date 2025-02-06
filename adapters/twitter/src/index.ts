@@ -5,6 +5,8 @@ import { TwitterInteractionClient } from "./interactions.ts";
 import { TwitterPostClient } from "./post.ts";
 import { TwitterSearchClient } from "./search.ts";
 import { TwitterSpaceClient } from "./spaces.ts";
+import { EventEmitter } from 'events';
+import { Logger } from '@hiveai/utils';
 
 /**
  * A manager that orchestrates all specialized Twitter logic:
@@ -85,3 +87,10 @@ export const TwitterClientInterface: Client = {
 };
 
 export default TwitterClientInterface;
+
+export class TwitterAdapter extends EventEmitter {
+    constructor() {
+        super();
+        Logger.info('Twitter adapter initialized');
+    }
+}

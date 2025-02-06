@@ -13,7 +13,7 @@
  */
 
 import { AgentOrchestrator } from "./services/agentOrchestrator";
-import { TelegramAdapter } from "@hiveai/adapters-telegram";
+// import { TelegramAdapter } from "@hiveai/adapters-telegram";
 import { DiscordAdapter } from "@hiveai/adapters-discord";
 import { TradeExecutionService } from "./services/tradeExecutionService";
 import { DragonbeeModule } from "./modules/dragonbeeModule";
