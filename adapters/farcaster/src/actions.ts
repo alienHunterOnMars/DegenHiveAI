@@ -1,5 +1,5 @@
 import type { FarcasterClient } from "./client";
-import type { Content, IAgentRuntime, Memory, UUID } from "@hiveai/core";
+import type { UUID } from "@hiveai/core";
 import type { Cast, CastId, Profile } from "./types";
 import { createCastMemory } from "./memory";
 import { splitPostContent } from "./utils";
@@ -14,12 +14,12 @@ export async function sendCast({
 }: {
     profile: Profile;
     client: FarcasterClient;
-    runtime: IAgentRuntime;
-    content: Content;
+    runtime: any;
+    content: any;
     roomId: UUID;
     signerUuid: string;
     inReplyTo?: CastId;
-}): Promise<{ memory: Memory; cast: Cast }[]> {
+}): Promise<{ memory: any; cast: Cast }[]> {
     const chunks = splitPostContent(content.text);
     const sent: Cast[] = [];
     let parentCastId = inReplyTo;

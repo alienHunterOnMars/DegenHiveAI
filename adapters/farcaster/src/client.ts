@@ -1,24 +1,24 @@
-import { type IAgentRuntime, elizaLogger } from "@hiveai/core";
 import { type NeynarAPIClient, isApiErrorResponse } from "@neynar/nodejs-sdk";
 import type { NeynarCastResponse, Cast, Profile, FidRequest, CastId } from "./types";
-import type { FarcasterConfig } from "./environment";
+import type { FarcasterAdapterConfig } from "./environment";
+import { Logger } from "@hiveai/utils";
 
 export class FarcasterClient {
-    runtime: IAgentRuntime;
+    runtime: any;
     neynar: NeynarAPIClient;
     signerUuid: string;
     cache: Map<string, any>;
     lastInteractionTimestamp: Date;
-    farcasterConfig: FarcasterConfig;
+    farcasterConfig: FarcasterAdapterConfig;
 
     constructor(opts: {
-        runtime: IAgentRuntime;
+        runtime: any;
         url: string;
         ssl: boolean;
         neynar: NeynarAPIClient;
         signerUuid: string;
         cache: Map<string, any>;
-        farcasterConfig: FarcasterConfig;
+        farcasterConfig: FarcasterAdapterConfig;
     }) {
         this.cache = opts.cache;
         this.runtime = opts.runtime;
@@ -68,10 +68,10 @@ export class FarcasterClient {
             }
         } catch (err) {
             if (isApiErrorResponse(err)) {
-                elizaLogger.error("Neynar error: ", err.response.data);
+                Logger.error("Neynar error: ", err.response.data);
                 throw err.response.data;
             } else {
-                elizaLogger.error("Error: ", err);
+                Logger.error("Error: ", err);
                 throw err;
             }
         }
@@ -177,7 +177,7 @@ export class FarcasterClient {
 
         const result = await this.neynar.fetchBulkUsers({ fids: [fid] });
         if (!result.users || result.users.length < 1) {
-            elizaLogger.error("Error fetching user by fid");
+            Logger.error("Error fetching user by fid");
 
             throw "getProfile ERROR";
         }
@@ -231,5 +231,23 @@ export class FarcasterClient {
             //TODO implement paging
             //nextPageToken: results.nextPageToken,
         };
+    }
+
+    async connect(): Promise<void> {
+        Logger.info('Connected to Farcaster');
+    }
+
+    async disconnect(): Promise<void> {
+        Logger.info('Disconnected from Farcaster');
+    }
+
+    async cast(text: string): Promise<void> {
+        try {
+            await this.publishCast(text, undefined);
+            Logger.info('Cast published successfully');
+        } catch (error) {
+            Logger.error('Error publishing cast:', error);
+            throw error;
+        }
     }
 }

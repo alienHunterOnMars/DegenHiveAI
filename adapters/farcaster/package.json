@@ -18,20 +18,20 @@
 		"dist"
 	],
 	"dependencies": {
-		"@hiveai/utils": "workspace:*",
-		"@hiveai/messaging": "workspace:*",
-		"@hiveai/core": "workspace:*",
 		"@farcaster/hub-nodejs": "^0.10.0",
+		"@hiveai/core": "workspace:*",
+		"@hiveai/messaging": "workspace:*",
+		"@hiveai/utils": "workspace:*",
 		"@neynar/nodejs-sdk": "^2.0.3",
-		"viem": "^2.0.0",
+		"viem": "^2.22.22",
 		"zod": "3.23.8"
 	},
 	"devDependencies": {
-		"@types/node": "^20.0.0",
 		"@types/events": "^3.0.3",
+		"@types/node": "^20.0.0",
+		"@vitest/coverage-v8": "1.1.3",
 		"tsup": "8.3.5",
-		"vitest": "1.1.3",
-		"@vitest/coverage-v8": "1.1.3"
+		"vitest": "1.1.3"
 	},
 	"scripts": {
 		"build": "tsup --format esm --dts",

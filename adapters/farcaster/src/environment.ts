@@ -29,7 +29,7 @@ export const farcasterEnvSchema = z.object({
         .default(ActionTimelineType.ForYou),
 });
 
-export type FarcasterConfig = z.infer<typeof farcasterEnvSchema>;
+export type FarcasterAdapterConfig = z.infer<typeof farcasterEnvSchema>;
 
 function safeParseInt(
     value: string | undefined | null,
@@ -46,7 +46,7 @@ function safeParseInt(
  */
 export async function validateFarcasterConfig(
     runtime: IAgentRuntime
-): Promise<FarcasterConfig> {
+    ): Promise<FarcasterAdapterConfig> {
     try {
         const farcasterConfig = {
             FARCASTER_DRY_RUN:

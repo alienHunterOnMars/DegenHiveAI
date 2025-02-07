@@ -1,11 +1,11 @@
 import {
-    elizaLogger,
-    getEmbeddingZeroVector,
+    // getEmbeddingZeroVector,
     type IAgentRuntime,
-    stringToUuid,
-    type Memory,
+    // stringToUuid,
+    // type Memory,
     type UUID,
 } from "@hiveai/core";
+import { Logger } from "@hiveai/utils";
 import type { Cast } from "./types";
 import { toHex } from "viem";
 import { castUuid } from "./utils";
@@ -19,9 +19,9 @@ export function createCastMemory({
 }: {
     roomId: UUID;
     senderId: UUID;
-    runtime: IAgentRuntime;
+    runtime: any;
     cast: Cast;
-}): Memory {
+}): any {
     const inReplyTo = cast.inReplyTo
         ? castUuid({
               hash: toHex(cast.inReplyTo.hash),
@@ -44,7 +44,7 @@ export function createCastMemory({
             hash: cast.hash,
         },
         roomId,
-        embedding: getEmbeddingZeroVector(),
+        embedding: null, // getEmbeddingZeroVector(),
     };
 }
 
@@ -54,7 +54,7 @@ export async function buildConversationThread({
     client,
 }: {
     cast: Cast;
-    runtime: IAgentRuntime;
+    runtime: any;
     client: FarcasterClient;
 }): Promise<Cast[]> {
     const thread: Cast[] = [];
@@ -75,9 +75,9 @@ export async function buildConversationThread({
         const memory = await runtime.messageManager.getMemoryById(roomId);
 
         if (!memory) {
-            elizaLogger.log("Creating memory for cast", currentCast.hash);
+            Logger.log("Creating memory for cast", currentCast.hash);
 
-            const userId = stringToUuid(currentCast.authorFid.toString());
+            const userId = ""; // stringToUuid(currentCast.authorFid.toString());
 
             await runtime.ensureConnection(
                 userId,

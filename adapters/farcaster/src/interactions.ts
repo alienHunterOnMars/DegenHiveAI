@@ -1,19 +1,19 @@
 import {
     composeContext,
-    generateMessageResponse,
-    generateShouldRespond,
-    type Memory,
-    ModelClass,
+    // generateMessageResponse,
+    // generateShouldRespond,
+    // type Memory,
+    // ModelClass,
     stringToUuid,
-    elizaLogger,
-    type HandlerCallback,
-    type Content,
-    type IAgentRuntime,
+    // type HandlerCallback,
+    // type Content,
+    // type IAgentRuntime,
 } from "@hiveai/core";
 import type { FarcasterClient } from "./client";
 import { toHex } from "viem";
 import { buildConversationThread, createCastMemory } from "./memory";
 import type { Cast, Profile } from "./types";
+import { Logger } from "@hiveai/utils";
 import {
     formatCast,
     formatTimeline,
@@ -27,7 +27,7 @@ export class FarcasterInteractionManager {
     private timeout: NodeJS.Timeout | undefined;
     constructor(
         public client: FarcasterClient,
-        public runtime: IAgentRuntime,
+        public runtime: any,
         private signerUuid: string,
         public cache: Map<string, any>
     ) {}
@@ -37,7 +37,7 @@ export class FarcasterInteractionManager {
             try {
                 await this.handleInteractions();
             } catch (error) {
-                elizaLogger.error(error);
+                Logger.error(error);
             }
 
             // Always set up next check, even if there was an error
@@ -56,9 +56,9 @@ export class FarcasterInteractionManager {
     }
 
     private async handleInteractions() {
-        const agentFid = this.client.farcasterConfig?.FARCASTER_FID ?? 0;
+        const agentFid: any = this.client.farcasterConfig?.FARCASTER_FID ?? 0;
         if (!agentFid) {
-            elizaLogger.info("No FID found, skipping interactions");
+            Logger.info("No FID found, skipping interactions");
             return;
         }
 
@@ -100,7 +100,7 @@ export class FarcasterInteractionManager {
                 cast: mention,
             });
 
-            const memory: Memory = {
+            const memory: any = {
                 content: { text: mention.text },
                 agentId: this.runtime.agentId,
                 userId,
@@ -126,166 +126,166 @@ export class FarcasterInteractionManager {
     }: {
         agent: Profile;
         cast: Cast;
-        memory: Memory;
+        memory: any;
         thread: Cast[];
     }) {
         if (cast.profile.fid === agent.fid) {
-            elizaLogger.info("skipping cast from bot itself", cast.hash);
+            Logger.info("skipping cast from bot itself", cast.hash);
             return;
         }
 
         if (!memory.content.text) {
-            elizaLogger.info("skipping cast with no text", cast.hash);
+            Logger.info("skipping cast with no text", cast.hash);
             return { text: "", action: "IGNORE" };
         }
 
-        const currentPost = formatCast(cast);
+    //     const currentPost = formatCast(cast);
 
-        const senderId = stringToUuid(cast.authorFid.toString());
+    //     const senderId = stringToUuid(cast.authorFid.toString());
 
-        const { timeline } = await this.client.getTimeline({
-            fid: agent.fid,
-            pageSize: 10,
-        });
+    //     const { timeline } = await this.client.getTimeline({
+    //         fid: agent.fid,
+    //         pageSize: 10,
+    //     });
 
-        const formattedTimeline = formatTimeline(
-            this.runtime.character,
-            timeline
-        );
+    //     const formattedTimeline = formatTimeline(
+    //         this.runtime.character,
+    //         timeline
+    //     );
 
-        const formattedConversation = thread
-            .map(
-                (cast) => `@${cast.profile.username} (${new Date(
-                    cast.timestamp
-                ).toLocaleString("en-US", {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                    month: "short",
-                    day: "numeric",
-                })}):
-                ${cast.text}`
-            )
-            .join("\n\n");
+    //     const formattedConversation = thread
+    //         .map(
+    //             (cast) => `@${cast.profile.username} (${new Date(
+    //                 cast.timestamp
+    //             ).toLocaleString("en-US", {
+    //                 hour: "2-digit",
+    //                 minute: "2-digit",
+    //                 month: "short",
+    //                 day: "numeric",
+    //             })}):
+    //             ${cast.text}`
+    //         )
+    //         .join("\n\n");
 
-        const state = await this.runtime.composeState(memory, {
-            farcasterUsername: agent.username,
-            timeline: formattedTimeline,
-            currentPost,
-            formattedConversation,
-        });
+    //     const state = await this.runtime.composeState(memory, {
+    //         farcasterUsername: agent.username,
+    //         timeline: formattedTimeline,
+    //         currentPost,
+    //         formattedConversation,
+    //     });
 
-        const shouldRespondContext = composeContext({
-            state,
-            template:
-                this.runtime.character.templates
-                    ?.farcasterShouldRespondTemplate ||
-                this.runtime.character?.templates?.shouldRespondTemplate ||
-                shouldRespondTemplate,
-        });
+    //     const shouldRespondContext = composeContext({
+    //         state,
+    //         template:
+    //             this.runtime.character.templates
+    //                 ?.farcasterShouldRespondTemplate ||
+    //             this.runtime.character?.templates?.shouldRespondTemplate ||
+    //             shouldRespondTemplate,
+    //     });
 
-        const memoryId = castUuid({
-            agentId: this.runtime.agentId,
-            hash: cast.hash,
-        });
+    //     const memoryId = castUuid({
+    //         agentId: this.runtime.agentId,
+    //         hash: cast.hash,
+    //     });
 
-        const castMemory =
-            await this.runtime.messageManager.getMemoryById(memoryId);
+    //     const castMemory =
+    //         await this.runtime.messageManager.getMemoryById(memoryId);
 
-        if (!castMemory) {
-            await this.runtime.messageManager.createMemory(
-                createCastMemory({
-                    roomId: memory.roomId,
-                    senderId,
-                    runtime: this.runtime,
-                    cast,
-                })
-            );
-        }
+    //     if (!castMemory) {
+    //         await this.runtime.messageManager.createMemory(
+    //             createCastMemory({
+    //                 roomId: memory.roomId,
+    //                 senderId,
+    //                 runtime: this.runtime,
+    //                 cast,
+    //             })
+    //         );
+    //     }
 
-        const shouldRespondResponse = await generateShouldRespond({
-            runtime: this.runtime,
-            context: shouldRespondContext,
-            modelClass: ModelClass.SMALL,
-        });
+    //     const shouldRespondResponse = await generateShouldRespond({
+    //         runtime: this.runtime,
+    //         context: shouldRespondContext,
+    //         modelClass: ModelClass.SMALL,
+    //     });
 
-        if (
-            shouldRespondResponse === "IGNORE" ||
-            shouldRespondResponse === "STOP"
-        ) {
-            elizaLogger.info(
-                `Not responding to cast because generated ShouldRespond was ${shouldRespondResponse}`
-            );
-            return;
-        }
+    //     if (
+    //         shouldRespondResponse === "IGNORE" ||
+    //         shouldRespondResponse === "STOP"
+    //     ) {
+    //         Logger.info(
+    //             `Not responding to cast because generated ShouldRespond was ${shouldRespondResponse}`
+    //         );
+    //         return;
+    //     }
 
-        const context = composeContext({
-            state,
-            template:
-                this.runtime.character.templates
-                    ?.farcasterMessageHandlerTemplate ??
-                this.runtime.character?.templates?.messageHandlerTemplate ??
-                messageHandlerTemplate,
-        });
+    //     const context = composeContext({
+    //         state,
+    //         template:
+    //             this.runtime.character.templates
+    //                 ?.farcasterMessageHandlerTemplate ??
+    //             this.runtime.character?.templates?.messageHandlerTemplate ??
+    //             messageHandlerTemplate,
+    //     });
 
-        const responseContent = await generateMessageResponse({
-            runtime: this.runtime,
-            context,
-            modelClass: ModelClass.LARGE,
-        });
+    //     const responseContent = await generateMessageResponse({
+    //         runtime: this.runtime,
+    //         context,
+    //         modelClass: ModelClass.LARGE,
+    //     });
 
-        responseContent.inReplyTo = memoryId;
+    //     responseContent.inReplyTo = memoryId;
 
-        if (!responseContent.text) return;
+    //     if (!responseContent.text) return;
 
-        if (this.client.farcasterConfig?.FARCASTER_DRY_RUN) {
-            elizaLogger.info(
-                `Dry run: would have responded to cast ${cast.hash} with ${responseContent.text}`
-            );
-            return;
-        }
+    //     if (this.client.farcasterConfig?.FARCASTER_DRY_RUN) {
+    //         Logger.info(
+    //             `Dry run: would have responded to cast ${cast.hash} with ${responseContent.text}`
+    //         );
+    //         return;
+    //     }
 
-        const callback: HandlerCallback = async (
-            content: Content,
-            _files: any[]
-        ) => {
-            try {
-                if (memoryId && !content.inReplyTo) {
-                    content.inReplyTo = memoryId;
-                }
-                const results = await sendCast({
-                    runtime: this.runtime,
-                    client: this.client,
-                    signerUuid: this.signerUuid,
-                    profile: cast.profile,
-                    content: content,
-                    roomId: memory.roomId,
-                    inReplyTo: {
-                        fid: cast.authorFid,
-                        hash: cast.hash,
-                    },
-                });
-                // sendCast lost response action, so we need to add it back here
-                results[0].memory.content.action = content.action;
+    //     const callback: HandlerCallback = async (
+    //         content: Content,
+    //         _files: any[]
+    //     ) => {
+    //         try {
+    //             if (memoryId && !content.inReplyTo) {
+    //                 content.inReplyTo = memoryId;
+    //             }
+    //             const results = await sendCast({
+    //                 runtime: this.runtime,
+    //                 client: this.client,
+    //                 signerUuid: this.signerUuid,
+    //                 profile: cast.profile,
+    //                 content: content,
+    //                 roomId: memory.roomId,
+    //                 inReplyTo: {
+    //                     fid: cast.authorFid,
+    //                     hash: cast.hash,
+    //                 },
+    //             });
+    //             // sendCast lost response action, so we need to add it back here
+    //             results[0].memory.content.action = content.action;
 
-                for (const { memory } of results) {
-                    await this.runtime.messageManager.createMemory(memory);
-                }
-                return results.map((result) => result.memory);
-            } catch (error) {
-                elizaLogger.error("Error sending response cast:", error);
-                return [];
-            }
-        };
+    //             for (const { memory } of results) {
+    //                 await this.runtime.messageManager.createMemory(memory);
+    //             }
+    //             return results.map((result) => result.memory);
+    //         } catch (error) {
+    //             Logger.error("Error sending response cast:", error);
+    //             return [];
+    //         }
+    //     };
 
-        const responseMessages = await callback(responseContent);
+    //     const responseMessages = await callback(responseContent);
 
-        const newState = await this.runtime.updateRecentMessageState(state);
+    //     const newState = await this.runtime.updateRecentMessageState(state);
 
-        await this.runtime.processActions(
-            { ...memory, content: { ...memory.content, cast } },
-            responseMessages,
-            newState,
-            callback
-        );
+    //     await this.runtime.processActions(
+    //         { ...memory, content: { ...memory.content, cast } },
+    //         responseMessages,
+    //         newState,
+    //         callback
+    //     );
     }
 }

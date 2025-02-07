@@ -1,9 +1,9 @@
-import { type Client, type IAgentRuntime, elizaLogger } from "@hiveai/core";
+import { type Client, type IAgentRuntime } from "@hiveai/core";
 import { FarcasterClient } from "./client";
 import { FarcasterPostManager } from "./post";
 import { FarcasterInteractionManager } from "./interactions";
 import { Configuration, NeynarAPIClient } from "@neynar/nodejs-sdk";
-import { validateFarcasterConfig, type FarcasterConfig } from "./environment";
+import { validateFarcasterConfig, type FarcasterAdapterConfig } from "./environment";
 import { EventEmitter } from 'events';
 import { Logger } from '@hiveai/utils';
 import { MessageBroker, CrossClientMessage } from '@hiveai/messaging';
@@ -20,7 +20,7 @@ class FarcasterManager {
     interactions: FarcasterInteractionManager;
     private signerUuid: string;
 
-    constructor(runtime: IAgentRuntime, farcasterConfig: FarcasterConfig) {
+    constructor(runtime: IAgentRuntime, farcasterConfig: FarcasterAdapterConfig) {
         const cache = new Map<string, any>();
         this.signerUuid = runtime.getSetting("FARCASTER_NEYNAR_SIGNER_UUID")!;
 
@@ -76,7 +76,9 @@ export const FarcasterClientInterface: Client = {
 
         // Start all services
         await manager.start();
-        runtime.clients.farcaster = manager;
+        if (runtime.clients) {
+            runtime.clients.farcaster = manager;
+        }
         return manager;
     },
 
@@ -84,7 +86,7 @@ export const FarcasterClientInterface: Client = {
         try {
             // stop it
             Logger.log("Stopping farcaster client", runtime.agentId);
-            if (runtime.clients.farcaster) {
+            if (runtime.clients?.farcaster) {
                 await runtime.clients.farcaster.stop();
             }
         } catch (e) {
@@ -112,7 +114,18 @@ export class FarcasterAdapter extends EventEmitter {
     constructor(config: FarcasterConfig) {
         super();
         this.config = config;
-        this.client = new FarcasterClient(config);
+        this.client = new FarcasterClient({
+            runtime: {
+                agentId: "farcaster-adapter",
+                getSetting: () => undefined
+            } as IAgentRuntime,
+            url: "hub.pinata.cloud",
+            ssl: true,
+            neynar: new NeynarAPIClient({ apiKey: config.apiKey }),
+            signerUuid: "",
+            cache: new Map(),
+            farcasterConfig: {} as any
+        });
 
         // Initialize RabbitMQ if config provided
         if (config.messageBroker) {
@@ -199,17 +212,5 @@ export class FarcasterAdapter extends EventEmitter {
         await this.client.disconnect();
         Logger.info('Farcaster adapter stopped');
     }
-
-    async broadcastMessage(content: string): Promise<void> {
-        if (!this.messageBroker) return;
-
-        await this.messageBroker.publish({
-            source: 'farcaster',
-            type: 'MESSAGE',
-            payload: {
-                content,
-                timestamp: Date.now()
-            }
-        });
-    }
+ 
 }
