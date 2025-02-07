@@ -52,8 +52,8 @@ import {
 } from "./types";
 import { fal } from "@fal-ai/client";
 
-import BigNumber from "bignumber.js";
-import { createPublicClient, http } from "viem";
+// import BigNumber from "bignumber.js";
+// import { createPublicClient, http } from "viem";
 
 type Tool = CoreTool<any, any>;
 type StepResult = AIStepResult<any>;
@@ -165,113 +165,6 @@ async function truncateTiktoken(
         return context.slice(-maxTokens * 4); // Rough estimate of 4 chars per token
     }
 }
-
-// /**
-//  * Get OnChain EternalAI System Prompt
-//  * @returns System Prompt
-//  */
-// async function getOnChainEternalAISystemPrompt(
-//     runtime: IAgentRuntime
-// ): Promise<string> | undefined {
-//     const agentId = runtime.getSetting("ETERNALAI_AGENT_ID");
-//     const providerUrl = runtime.getSetting("ETERNALAI_RPC_URL");
-//     const contractAddress = runtime.getSetting(
-//         "ETERNALAI_AGENT_CONTRACT_ADDRESS"
-//     );
-//     if (agentId && providerUrl && contractAddress) {
-//         // get on-chain system-prompt
-//         const contractABI = [
-//             {
-//                 inputs: [
-//                     {
-//                         internalType: "uint256",
-//                         name: "_agentId",
-//                         type: "uint256",
-//                     },
-//                 ],
-//                 name: "getAgentSystemPrompt",
-//                 outputs: [
-//                     { internalType: "bytes[]", name: "", type: "bytes[]" },
-//                 ],
-//                 stateMutability: "view",
-//                 type: "function",
-//             },
-//         ];
-
-//         const publicClient = createPublicClient({
-//             transport: http(providerUrl),
-//         });
-
-//         try {
-//             const validAddress: `0x${string}` =
-//                 contractAddress as `0x${string}`;
-//             const result = await publicClient.readContract({
-//                 address: validAddress,
-//                 abi: contractABI,
-//                 functionName: "getAgentSystemPrompt",
-//                 args: [new BigNumber(agentId)],
-//             });
-//             if (result) {
-//                 Logger.info("on-chain system-prompt response", result[0]);
-//                 const value = result[0].toString().replace("0x", "");
-//                 const content = Buffer.from(value, "hex").toString("utf-8");
-//                 Logger.info("on-chain system-prompt", content);
-//                 return await fetchEternalAISystemPrompt(runtime, content);
-//             } else {
-//                 return undefined;
-//             }
-//         } catch (error) {
-//             Logger.error(error);
-//             Logger.error("err", error);
-//         }
-//     }
-//     return undefined;
-// }
-
-// /**
-//  * Fetch EternalAI System Prompt
-//  * @returns System Prompt
-//  */
-// async function fetchEternalAISystemPrompt(
-//     runtime: IAgentRuntime,
-//     content: string
-// ): Promise<string> | undefined {
-//     const IPFS = "ipfs://";
-//     const containsSubstring: boolean = content.includes(IPFS);
-//     if (containsSubstring) {
-//         const lightHouse = content.replace(
-//             IPFS,
-//             "https://gateway.lighthouse.storage/ipfs/"
-//         );
-//         Logger.info("fetch lightHouse", lightHouse);
-//         const responseLH = await fetch(lightHouse, {
-//             method: "GET",
-//         });
-//         Logger.info("fetch lightHouse resp", responseLH);
-//         if (responseLH.ok) {
-//             const data = await responseLH.text();
-//             return data;
-//         } else {
-//             const gcs = content.replace(
-//                 IPFS,
-//                 "https://cdn.eternalai.org/upload/"
-//             );
-//             Logger.info("fetch gcs", gcs);
-//             const responseGCS = await fetch(gcs, {
-//                 method: "GET",
-//             });
-//             Logger.info("fetch lightHouse gcs", responseGCS);
-//             if (responseGCS.ok) {
-//                 const data = await responseGCS.text();
-//                 return data;
-//             } else {
-//                 throw new Error("invalid on-chain system prompt");
-//             }
-//         }
-//     } else {
-//         return content;
-//     }
-// }
 
 /**
  * Gets the Cloudflare Gateway base URL for a specific provider if enabled
@@ -421,7 +314,7 @@ export async function generateText({
     const endpoint =
         runtime.character.modelEndpointOverride || getEndpoint(provider);
     const modelSettings = getModelSettings(runtime.modelProvider, modelClass);
-    let model = modelSettings?.name;
+    let model = modelSettings.name;
 
     // allow character.json settings => secrets to override models
     // FIXME: add MODEL_MEDIUM support
@@ -1195,11 +1088,12 @@ export async function generateText({
 
             case ModelProviderName.DEEPSEEK: {
                 Logger.debug("Initializing Deepseek model.");
+                const apiKeyValue: string | undefined = apiKey || undefined;
                 const serverUrl = models[provider].endpoint;
                 const deepseek = createOpenAI({
-                    apiKey,
+                    apiKey: apiKeyValue,
                     baseURL: serverUrl,
-                    fetch: runtime.fetch,
+                    fetch: (runtime.fetch ?? undefined) as ((input: string | URL | Request, init?: RequestInit) => Promise<Response>) | undefined
                 });
 
                 const { text: deepseekResponse } = await aiGenerateText({
@@ -1224,64 +1118,66 @@ export async function generateText({
                 break;
             }
 
-            case ModelProviderName.LIVEPEER: {
-                Logger.debug("Initializing Livepeer model.");
+            // case ModelProviderName.LIVEPEER: {
+            //     Logger.debug("Initializing Livepeer model.");
 
-                if (!endpoint) {
-                    throw new Error("Livepeer Gateway URL is not defined");
-                }
+            //     if (!endpoint) {
+            //         throw new Error("Livepeer Gateway URL is not defined");
+            //     }
 
-                const requestBody = {
-                    model: model,
-                    messages: [
-                        {
-                            role: "system",
-                            content:
-                                runtime.character.system ??
-                                settings.SYSTEM_PROMPT ??
-                                "You are a helpful assistant",
-                        },
-                        {
-                            role: "user",
-                            content: context,
-                        },
-                    ],
-                    max_tokens: max_response_length,
-                    stream: false,
-                };
+            //     const requestBody = {
+            //         model: model,
+            //         messages: [
+            //             {
+            //                 role: "system",
+            //                 content:
+            //                     runtime.character.system ??
+            //                     settings.SYSTEM_PROMPT ??
+            //                     "You are a helpful assistant",
+            //             },
+            //             {
+            //                 role: "user",
+            //                 content: context,
+            //             },
+            //         ],
+            //         max_tokens: max_response_length,
+            //         stream: false,
+            //     };
 
-                const fetchResponse = await runtime.fetch(endpoint + "/llm", {
-                    method: "POST",
-                    headers: {
-                        accept: "text/event-stream",
-                        "Content-Type": "application/json",
-                        Authorization: "Bearer eliza-app-llm",
-                    },
-                    body: JSON.stringify(requestBody),
-                });
+            //     const fetch = runtime.fetch ?? global.fetch;
+            //     if (!fetch) throw new Error("No fetch implementation available");
+            //     const fetchResponse = await fetch(endpoint + "/llm", {
+            //         method: "POST",
+            //         headers: {
+            //             accept: "text/event-stream",
+            //             "Content-Type": "application/json",
+            //             Authorization: "Bearer eliza-app-llm",
+            //         },
+            //         body: JSON.stringify(requestBody),
+            //     });
 
-                if (!fetchResponse.ok) {
-                    const errorText = await fetchResponse.text();
-                    throw new Error(
-                        `Livepeer request failed (${fetchResponse.status}): ${errorText}`
-                    );
-                }
+            //     if (!fetchResponse.ok) {
+            //         const errorText = await fetchResponse.text();
+            //         throw new Error(
+            //             `Livepeer request failed (${fetchResponse.status}): ${errorText}`
+            //         );
+            //     }
 
-                const json = await fetchResponse.json();
+            //     const json: any = await fetchResponse.json();
 
-                if (!json?.choices?.[0]?.message?.content) {
-                    throw new Error("Invalid response format from Livepeer");
-                }
+            //     if (!json?.choices?.[0]?.message?.content) {
+            //         throw new Error("Invalid response format from Livepeer");
+            //     }
 
-                response = json.choices[0].message.content.replace(
-                    /<\|start_header_id\|>assistant<\|end_header_id\|>\n\n/,
-                    ""
-                );
-                Logger.debug(
-                    "Successfully received response from Livepeer model"
-                );
-                break;
-            }
+            //     response = json.choices[0].message.content.replace(
+            //         /<\|start_header_id\|>assistant<\|end_header_id\|>\n\n/,
+            //         ""
+            //     );
+            //     Logger.debug(
+            //         "Successfully received response from Livepeer model"
+            //     );
+            //     break;
+            // }
 
             default: {
                 const errorMessage = `Unsupported provider: ${provider}`;
@@ -1413,7 +1309,7 @@ export async function generateTrueOrFalse({
     modelClass: ModelClass;
 }): Promise<boolean> {
     let retryDelay = 1000;
-    const modelSettings = getModelSettings(runtime.modelProvider, modelClass);
+    const modelSettings: any = getModelSettings(runtime.modelProvider, modelClass);
     const stop = Array.from(
         new Set([...(modelSettings.stop || []), ["\n"]])
     ) as string[];
@@ -1718,7 +1614,7 @@ export const generateImage = async (
                 );
             }
 
-            const imageURL = await response.json();
+            const imageURL : any = await response.json();
             return { success: true, data: [imageURL] };
         } else if (
             runtime.imageModelProvider === ModelProviderName.TOGETHER ||
@@ -1814,14 +1710,14 @@ export const generateImage = async (
             const result = await fal.subscribe(model, {
                 input,
                 logs: true,
-                onQueueUpdate: (update) => {
+                onQueueUpdate: (update: any) => {
                     if (update.status === "IN_PROGRESS") {
-                        Logger.info(update.logs.map((log) => log.message));
+                        Logger.info(update.logs.map((log: any) => log.message));
                     }
                 },
             });
             // Convert the returned image URLs to base64 to match existing functionality
-            const base64Promises = result.data.images.map(async (image) => {
+            const base64Promises = result.data.images.map(async (image: any) => {
                 const response = await fetch(image.url);
                 const blob = await response.blob();
                 const buffer = await blob.arrayBuffer();
@@ -1856,13 +1752,13 @@ export const generateImage = async (
                 }
             );
 
-            const result = await response.json();
+            const result : any = await response.json();
 
             if (!result.images || !Array.isArray(result.images)) {
                 throw new Error("Invalid response format from Venice AI");
             }
 
-            const base64s = result.images.map((base64String) => {
+            const base64s = result.images.map((base64String: any) => {
                 if (!base64String) {
                     throw new Error(
                         "Empty base64 string in Venice AI response"
@@ -1895,13 +1791,13 @@ export const generateImage = async (
                 }
             );
 
-            const result = await response.json();
+            const result: any = await response.json();
 
             if (!result.images || !Array.isArray(result.images)) {
                 throw new Error("Invalid response format from Nineteen AI");
             }
 
-            const base64s = result.images.map((base64String) => {
+            const base64s = result.images.map((base64String: any) => {
                 if (!base64String) {
                     throw new Error(
                         "Empty base64 string in Nineteen AI response"
@@ -1938,12 +1834,12 @@ export const generateImage = async (
                         }),
                     }
                 );
-                const result = await response.json();
+                const result: any = await response.json();
                 if (!result.images?.length) {
                     throw new Error("No images generated");
                 }
                 const base64Images = await Promise.all(
-                    result.images.map(async (image) => {
+                    result.images.map(async (image: any) => {
                         console.log("imageUrl console log", image.url);
                         let imageUrl;
                         if (image.url.includes("http")) {
@@ -2105,8 +2001,8 @@ export const generateObject = async ({
             prompt: context,
             temperature,
             maxTokens: max_response_length,
-            frequencyPenalty: frequency_penalty,
-            presencePenalty: presence_penalty,
+            frequencyPenalty: frequency_penalty ?? 0,
+            presencePenalty: presence_penalty ?? 0,
             stop: stop || modelSettings.stop,
             experimental_telemetry: experimental_telemetry,
         };
@@ -2114,7 +2010,7 @@ export const generateObject = async ({
         const response = await handleProvider({
             provider,
             model,
-            apiKey,
+            apiKey: apiKey ?? "",
             schema,
             schemaName,
             schemaDescription,
@@ -2219,36 +2115,37 @@ export async function handleProvider(
         }
     }
 }
-/**
- * Handles object generation for OpenAI.
- *
- * @param {ProviderOptions} options - Options specific to OpenAI.
- * @returns {Promise<GenerateObjectResult<unknown>>} - A promise that resolves to generated objects.
- */
-async function handleOpenAI({
-    model,
-    apiKey,
-    schema,
-    schemaName,
-    schemaDescription,
-    mode = "json",
-    modelOptions,
-    provider: _provider,
-    runtime,
-}: ProviderOptions): Promise<GenerateObjectResult<unknown>> {
-    const baseURL =
-        getCloudflareGatewayBaseURL(runtime, "openai") ||
-        models.openai.endpoint;
-    const openai = createOpenAI({ apiKey, baseURL });
-    return await aiGenerateObject({
-        model: openai.languageModel(model),
-        schema,
-        schemaName,
-        schemaDescription,
-        mode,
-        ...modelOptions,
-    });
-}
+
+// /**
+//  * Handles object generation for OpenAI.
+//  *
+//  * @param {ProviderOptions} options - Options specific to OpenAI.
+//  * @returns {Promise<GenerateObjectResult<unknown>>} - A promise that resolves to generated objects.
+//  */
+// async function handleOpenAI({
+//     model,
+//     apiKey,
+//     schema,
+//     schemaName,
+//     schemaDescription,
+//     mode = "json",
+//     modelOptions,
+//     provider: _provider,
+//     runtime,
+// }: ProviderOptions): Promise<GenerateObjectResult<unknown>> {
+//     const baseURL =
+//         getCloudflareGatewayBaseURL(runtime, "openai") ||
+//         models.openai.endpoint;
+//     const openai = createOpenAI({ apiKey, baseURL });
+//     return await aiGenerateObject({
+//         model: openai.languageModel(model),
+//         schema,
+//         schemaName,
+//         schemaDescription,
+//         mode,
+//         ...modelOptions,
+//     });
+// }
 
 // /**
 //  * Handles object generation for Anthropic models.
@@ -2489,10 +2386,11 @@ async function handleDeepSeek({
     schema,
     schemaName,
     schemaDescription,
-    mode,
+    mode = "json",
     modelOptions,
 }: ProviderOptions): Promise<GenerateObjectResult<unknown>> {
     const openai = createOpenAI({ apiKey, baseURL: models.deepseek.endpoint });
+
     return await aiGenerateObject({
         model: openai.languageModel(model),
         schema,

@@ -30,11 +30,14 @@
         "@fal-ai/client": "^1.2.3",
         "@huggingface/transformers": "^3.3.3",
         "ai": "^4.1.25",
+        "bignumber.js": "^9.1.2",
         "fastembed": "^1.14.1",
         "handlebars": "^4.7.8",
         "js-sha1": "^0.7.0",
         "js-tiktoken": "^1.0.18",
+        "langchain": "^0.3.15",
         "together-ai": "^0.13.0",
-        "unique-names-generator": "^4.7.1"
+        "unique-names-generator": "^4.7.1",
+        "viem": "^2.22.22"
     }
 }

@@ -1156,8 +1156,8 @@ export const models: Models = {
 export function getModelSettings(
     provider: ModelProviderName,
     type: ModelClass
-): ModelSettings | undefined {
-    return (models as any)[provider]?.model[type] as ModelSettings | undefined;
+): ModelSettings {
+    return (models as any)[provider]?.model[type] as ModelSettings;
 }
 
 export function getImageModelSettings(
