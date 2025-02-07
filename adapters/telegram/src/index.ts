@@ -6,19 +6,16 @@
  * - The TelegramClient (with its embedded MessageManager).
  * - Global periodic synchronization between global and local RL models.
  */
-import { TelegramClient } from "./telegramClient";
+import { EventEmitter } from 'events';
+import { Logger } from '@hiveai/utils';
+import { MessageBroker, CrossClientMessage } from '@hiveai/messaging';
+import { TelegramClient, TelegramClientOptions } from './telegramClient';
 import { UserManager } from "./userManager";
 import { TradeManager } from "./tradeManager";
 import { RLManager } from "./rlManager";
 import { MemoryManager } from "./memoryManager";
-import { Logger } from "@hiveai/utils";
-import { EventEmitter } from 'events';
-import { MessageBroker, CrossClientMessage } from '@hiveai/messaging';
 
-export interface TelegramConfig {
-    token: string;
-    founderChatId: string;
-    groupChatId: string;
+export interface TelegramConfig extends TelegramClientOptions {
     messageBroker?: {
         url: string;
         exchange: string;
@@ -26,8 +23,8 @@ export interface TelegramConfig {
 }
 
 export class TelegramAdapter extends EventEmitter {
-    private messageBroker?: MessageBroker;
     private client: TelegramClient;
+    private messageBroker?: MessageBroker;
     private readonly config: TelegramConfig;
 
     constructor(config: TelegramConfig) {
@@ -35,7 +32,6 @@ export class TelegramAdapter extends EventEmitter {
         this.config = config;
         this.client = new TelegramClient(config);
 
-        // Initialize RabbitMQ if config provided
         if (config.messageBroker) {
             this.messageBroker = new MessageBroker({
                 url: config.messageBroker.url,
@@ -75,37 +71,32 @@ export class TelegramAdapter extends EventEmitter {
     }
 
     private async handleIncomingMessage(message: CrossClientMessage): Promise<void> {
-        // Forward messages to appropriate Telegram channels/chats
         if (message.payload.content) {
             await this.client.sendMessage(this.config.groupChatId, message.payload.content);
         }
     }
 
     private async handleAlert(message: CrossClientMessage): Promise<void> {
-        // Send alerts to founder or designated alert channel
         if (message.payload.content) {
             await this.client.sendMessage(this.config.founderChatId, `🚨 ${message.payload.content}`);
         }
     }
 
     private async handleNotification(message: CrossClientMessage): Promise<void> {
-        // Handle notifications appropriately
         if (message.payload.content) {
             await this.client.sendMessage(this.config.groupChatId, `📢 ${message.payload.content}`);
         }
     }
 
     private async handleCommand(message: CrossClientMessage): Promise<void> {
-        // Process cross-platform commands
+        // Handle cross-platform commands
     }
 
     async start(): Promise<void> {
         try {
-            // Connect to RabbitMQ if configured
             if (this.messageBroker) {
                 await this.messageBroker.connect();
             }
-
             await this.client.start();
             Logger.info('Telegram adapter started successfully');
         } catch (error) {
@@ -123,7 +114,6 @@ export class TelegramAdapter extends EventEmitter {
     }
 
     async sendFounderMessage(message: string, options?: any): Promise<any> {
-        // Broadcast important messages to other platforms
         if (this.messageBroker && options?.broadcast) {
             await this.broadcastMessage(message);
         }
@@ -134,12 +124,12 @@ export class TelegramAdapter extends EventEmitter {
         if (!this.messageBroker) return;
 
         await this.messageBroker.publish({
-            source: 'telegram',
             type: 'MESSAGE',
             payload: {
                 content,
                 timestamp: Date.now()
-            }
+            },
+            timestamp: Date.now()
         });
     }
 }
@@ -161,11 +151,9 @@ async function boot() {
     }
 
     const telegramClient = new TelegramClient({
-      botToken: telegramBotToken,
-      userManager,
-      tradeManager,
-      rlManager,
-      memoryManager,
+      token: telegramBotToken,
+      founderChatId: process.env.TELEGRAM_FOUNDER_CHAT_ID || "",
+      groupChatId: process.env.TELEGRAM_GROUP_CHAT_ID || ""
     });
 
     // Start the Telegram client

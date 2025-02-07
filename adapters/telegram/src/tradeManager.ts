@@ -5,7 +5,7 @@
  * For simplicity, this implementation logs the trade execution.
  * In production, integrate with an exchange API.
  */
-import { Logger } from "./utils/logger";
+import { Logger } from "@hiveai/utils";
 
 export interface TradeOrder {
   side: "buy" | "sell";

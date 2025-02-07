@@ -1,4 +1,4 @@
-import amqp, { Channel, Connection, Message } from 'amqplib';
+import amqp, { Channel, Connection } from 'amqplib';
 import { EventEmitter } from 'events';
 import { Logger } from '@hiveai/utils';
 
@@ -6,134 +6,53 @@ export interface MessageBrokerConfig {
     url: string;
     exchange: string;
     clientId: string;
-    reconnectInterval?: number;
 }
 
 export interface CrossClientMessage {
-    source: string;
-    target?: string; // Optional, if not specified, broadcast to all
+    source?: string;
     type: 'MESSAGE' | 'ALERT' | 'NOTIFICATION' | 'COMMAND';
-    payload: any;
-    timestamp: number;
-    messageId: string;
+    payload: {
+        content: string;
+        timestamp: number;
+    };
 }
 
 export class MessageBroker extends EventEmitter {
     private connection?: Connection;
     private channel?: Channel;
     private readonly config: MessageBrokerConfig;
-    private reconnectTimer?: NodeJS.Timeout;
-    private readonly queues: Set<string> = new Set();
 
     constructor(config: MessageBrokerConfig) {
         super();
-        this.config = {
-            reconnectInterval: 5000,
-            ...config
-        };
+        this.config = config;
     }
 
     async connect(): Promise<void> {
         try {
             this.connection = await amqp.connect(this.config.url);
             this.channel = await this.connection.createChannel();
-
-            // Setup exchange
-            await this.channel.assertExchange(this.config.exchange, 'topic', {
-                durable: true
-            });
-
-            // Setup client-specific queue
-            const queueName = `${this.config.exchange}.${this.config.clientId}`;
-            await this.channel.assertQueue(queueName, {
-                durable: true,
-                arguments: {
-                    'x-message-ttl': 60000, // Messages expire after 1 minute
-                    'x-max-length': 1000 // Limit queue size
+            
+            await this.channel.assertExchange(this.config.exchange, 'fanout', { durable: false });
+            
+            const { queue } = await this.channel.assertQueue('', { exclusive: true });
+            await this.channel.bindQueue(queue, this.config.exchange, '');
+            
+            this.channel.consume(queue, (msg) => {
+                if (msg) {
+                    try {
+                        const message = JSON.parse(msg.content.toString()) as CrossClientMessage;
+                        if (message.source !== this.config.clientId) {
+                            this.emit('message', message);
+                        }
+                    } catch (error) {
+                        Logger.error('Error processing message:', error);
+                    }
                 }
-            });
+            }, { noAck: true });
 
-            // Bind to client-specific messages and broadcasts
-            await this.channel.bindQueue(queueName, this.config.exchange, this.config.clientId);
-            await this.channel.bindQueue(queueName, this.config.exchange, 'broadcast');
-
-            // Setup message handling
-            await this.channel.consume(queueName, this.handleMessage.bind(this), {
-                noAck: false
-            });
-
-            this.setupErrorHandlers();
-            Logger.info(`MessageBroker connected for client ${this.config.clientId}`);
+            Logger.info(`MessageBroker connected for ${this.config.clientId}`);
         } catch (error) {
-            Logger.error('Failed to connect to RabbitMQ:', error);
-            this.scheduleReconnect();
-        }
-    }
-
-    private setupErrorHandlers(): void {
-        if (this.connection) {
-            this.connection.on('error', (error) => {
-                Logger.error('RabbitMQ connection error:', error);
-                this.scheduleReconnect();
-            });
-
-            this.connection.on('close', () => {
-                Logger.warn('RabbitMQ connection closed');
-                this.scheduleReconnect();
-            });
-        }
-    }
-
-    private scheduleReconnect(): void {
-        if (!this.reconnectTimer) {
-            this.reconnectTimer = setTimeout(async () => {
-                this.reconnectTimer = undefined;
-                await this.connect();
-            }, this.config.reconnectInterval);
-        }
-    }
-
-    private handleMessage(msg: Message | null): void {
-        if (!msg) return;
-
-        try {
-            const content = JSON.parse(msg.content.toString()) as CrossClientMessage;
-            this.emit('message', content);
-            this.channel?.ack(msg);
-        } catch (error) {
-            Logger.error('Error processing message:', error);
-            // Reject malformed messages
-            this.channel?.reject(msg, false);
-        }
-    }
-
-    async publish(message: Omit<CrossClientMessage, 'timestamp' | 'messageId'>): Promise<void> {
-        if (!this.channel) {
-            throw new Error('Not connected to RabbitMQ');
-        }
-
-        const fullMessage: CrossClientMessage = {
-            ...message,
-            timestamp: Date.now(),
-            messageId: Math.random().toString(36).substring(2, 15)
-        };
-
-        const routingKey = message.target || 'broadcast';
-
-        try {
-            await this.channel.publish(
-                this.config.exchange,
-                routingKey,
-                Buffer.from(JSON.stringify(fullMessage)),
-                {
-                    persistent: true,
-                    messageId: fullMessage.messageId,
-                    timestamp: fullMessage.timestamp,
-                    contentType: 'application/json'
-                }
-            );
-        } catch (error) {
-            Logger.error('Failed to publish message:', error);
+            Logger.error('Failed to connect to MessageBroker:', error);
             throw error;
         }
     }
@@ -142,11 +61,31 @@ export class MessageBroker extends EventEmitter {
         try {
             await this.channel?.close();
             await this.connection?.close();
-            clearTimeout(this.reconnectTimer);
-            this.reconnectTimer = undefined;
-            Logger.info('MessageBroker disconnected');
+            Logger.info(`MessageBroker disconnected for ${this.config.clientId}`);
         } catch (error) {
-            Logger.error('Error disconnecting from RabbitMQ:', error);
+            Logger.error('Error disconnecting from MessageBroker:', error);
+            throw error;
+        }
+    }
+
+    async publish(message: Omit<CrossClientMessage, 'source'>): Promise<void> {
+        if (!this.channel) {
+            throw new Error('MessageBroker not connected');
+        }
+
+        try {
+            const fullMessage: CrossClientMessage = {
+                ...message,
+                source: this.config.clientId
+            };
+
+            await this.channel.publish(
+                this.config.exchange,
+                '',
+                Buffer.from(JSON.stringify(fullMessage))
+            );
+        } catch (error) {
+            Logger.error('Error publishing message:', error);
             throw error;
         }
     }

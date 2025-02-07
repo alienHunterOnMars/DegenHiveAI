@@ -3,7 +3,7 @@
  *
  * Supports retrieval-augmented generation by storing recent messages and context.
  */
-import { Logger } from "./utils/logger";
+import { Logger } from "@hiveai/utils";
 
 export interface IMemoryManager {
   updateMemory(userId: string, message: string): Promise<void>;

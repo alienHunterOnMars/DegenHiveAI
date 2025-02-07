@@ -4,7 +4,7 @@
  * Determines whether a Telegram user has linked their account with a dragonbee-trainer profile.
  * If not, a fee of 0.1% is applied to all trades.
  */
-import { Logger } from "./utils/logger";
+import { Logger } from "@hiveai/utils";
 
 export interface IUserManager {
   isFirstTime(userId: string): Promise<boolean>;

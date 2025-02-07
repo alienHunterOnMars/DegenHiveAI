@@ -6,7 +6,7 @@
  * - Local RL models for each chat and dragonbee, which are periodically
  *   synchronized with the global model.
  */
-import { Logger } from "./utils/logger";
+import { Logger } from "@hiveai/utils";
 
 export interface IRLManager {
   generateResponse(userId: string, message: string): Promise<string>;

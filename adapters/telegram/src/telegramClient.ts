@@ -4,77 +4,62 @@
  * and handles graceful shutdown.
  */
 import { Telegraf, Context } from "telegraf";
-import { MessageManager } from "./messageManager";
 import { Logger } from "@hiveai/utils";
-import { IUserManager } from "./userManager";
-import { ITradeManager } from "./tradeManager";
-import { IRLManager } from "./rlManager";
-import { IMemoryManager } from "./memoryManager";
+import { UserManager } from "./userManager";
+import { TradeManager } from "./tradeManager";
+import { RLManager } from "./rlManager";
+import { MemoryManager } from "./memoryManager";
+import { MessageManager } from "./messageManager";
 
-interface TelegramClientOptions {
-  botToken: string;
-  userManager: IUserManager;
-  tradeManager: ITradeManager;
-  rlManager: IRLManager;
-  memoryManager: IMemoryManager;
+export interface TelegramClientOptions {
+    token: string;
+    founderChatId: string;
+    groupChatId: string;
 }
 
 export class TelegramClient {
-  private bot: Telegraf<Context>;
-  private messageManager: MessageManager;
+    private bot: Telegraf;
+    private messageManager: MessageManager;
+    private userManager: UserManager;
+    private tradeManager: TradeManager;
+    private rlManager: RLManager;
+    private memoryManager: MemoryManager;
 
-  constructor(private options: TelegramClientOptions) {
-    Logger.info("Constructing Hive Swarm TelegramClient...");
-    this.bot = new Telegraf(options.botToken);
-    // Instantiate MessageManager and inject dependencies from options
-    this.messageManager = new MessageManager({
-      bot: this.bot,
-      userManager: options.userManager,
-      tradeManager: options.tradeManager,
-      rlManager: options.rlManager,
-      memoryManager: options.memoryManager,
-    });
-  }
+    constructor(private config: TelegramClientOptions) {
+        this.bot = new Telegraf(config.token);
+        
+        // Initialize managers
+        this.userManager = new UserManager();
+        this.tradeManager = new TradeManager();
+        this.rlManager = new RLManager();
+        this.memoryManager = new MemoryManager();
+        
+        this.messageManager = new MessageManager({
+            bot: this.bot,
+            userManager: this.userManager,
+            tradeManager: this.tradeManager,
+            rlManager: this.rlManager,
+            memoryManager: this.memoryManager
+        });
 
-  public async start(): Promise<void> {
-    Logger.info("Starting Telegram bot...");
-    try {
-      // Set up basic message handlers
-      this.setupHandlers();
-      // Launch the bot (drop pending updates in production)
-      await this.bot.launch({ dropPendingUpdates: true });
-      Logger.success("Telegram bot successfully launched!");
-      this.setupShutdownHandlers();
-    } catch (error) {
-      Logger.error("Error starting Telegram bot:", error);
-      throw error;
+        this.setupHandlers();
     }
-  }
 
-  private setupHandlers(): void {
-    // Delegate message handling to the MessageManager
-    this.bot.on("message", async (ctx) => {
-      try {
-        await this.messageManager.handleMessage(ctx);
-      } catch (error) {
-        Logger.error("Error in message handler:", error);
-      }
-    });
-  }
+    private setupHandlers() {
+        this.bot.on('message', (ctx) => this.messageManager.handleMessage(ctx));
+    }
 
-  private setupShutdownHandlers(): void {
-    const shutdownHandler = async (signal: string) => {
-      Logger.info(`Received ${signal}. Shutting down Telegram bot gracefully...`);
-      try {
+    async start(): Promise<void> {
+        await this.bot.launch();
+        Logger.info('Telegram client started');
+    }
+
+    async stop(): Promise<void> {
         await this.bot.stop();
-        Logger.info("Telegram bot stopped.");
-      } catch (error) {
-        Logger.error("Error during shutdown:", error);
-      }
-      process.exit(0);
-    };
+        Logger.info('Telegram client stopped');
+    }
 
-    process.once("SIGINT", () => shutdownHandler("SIGINT"));
-    process.once("SIGTERM", () => shutdownHandler("SIGTERM"));
-  }
+    async sendMessage(chatId: string, text: string, options?: any): Promise<any> {
+        return this.bot.telegram.sendMessage(chatId, text, options);
+    }
 }

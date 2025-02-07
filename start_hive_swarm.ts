@@ -21,6 +21,17 @@ import { TwitterAdapter } from '@hiveai/adapters-twitter';
 import { FarcasterAdapter } from '@hiveai/adapters-farcaster';
 import { EmailAdapter } from '@hiveai/adapters-email';
 
+// cd core && pnpm build
+// cd ../utils && pnpm build
+// cd ../messaging && pnpm build
+// cd ../adapters/telegram && pnpm build
+// cd ../discord && pnpm build
+// cd ../reddit && pnpm build
+// cd ../twitter && pnpm build
+// cd ../farcaster && pnpm build
+// cd ../email && pnpm build
+// cd ../.. && pnpm install
+
 // ----------------------------------------------------------------------------
 // Plugin Interfaces and Manager
 // ----------------------------------------------------------------------------

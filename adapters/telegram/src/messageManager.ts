@@ -8,7 +8,7 @@
  * - Managing RAG memory updates for user context.
  */
 import { Context, Telegraf } from "telegraf";
-import { Logger } from "./utils/logger";
+import { Logger } from "@hiveai/utils";
 import { IUserManager } from "./userManager";
 import { ITradeManager, TradeOrder } from "./tradeManager";
 import { IRLManager } from "./rlManager";
