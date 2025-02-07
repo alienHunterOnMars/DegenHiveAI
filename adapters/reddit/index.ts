@@ -12,7 +12,7 @@ export class RedditAdapter extends EventEmitter {
     private postHandler: RedditPostHandler;
     private config: RedditConfig;
     private messageBroker?: MessageBroker;
-    private pollInterval: NodeJS.Timeout;
+    private pollInterval!: NodeJS.Timeout;
 
     constructor(config: RedditConfig) {
         super();

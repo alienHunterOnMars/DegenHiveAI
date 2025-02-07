@@ -19,6 +19,8 @@
 	],
 	"dependencies": {
 		"@hiveai/utils": "workspace:*",
+		"@hiveai/messaging": "workspace:*",
+		"@farcaster/hub-nodejs": "^0.10.0",
 		"@neynar/nodejs-sdk": "^2.0.3",
 		"zod": "3.23.8",
 		"events": "^3.3.0"

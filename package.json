@@ -17,6 +17,7 @@
         "@hiveai/adapters-telegram": "workspace:*",
         "@hiveai/adapters-twitter": "workspace:*",
         "@hiveai/adapters-farcaster": "workspace:*",
+        "@hiveai/adapters-email": "workspace:*",
         "@hiveai/messaging": "workspace:*",
         "@hiveai/utils": "workspace:*",
         "dotenv": "^16.3.1",

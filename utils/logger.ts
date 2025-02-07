@@ -24,4 +24,8 @@ export class Logger {
     // \x1b[34m: blue; \x1b[0m: reset
     console.debug("\x1b[34m[DEBUG]\x1b[0m", ...args);
   }
+
+  static log(...args: any[]): void {
+    console.log(...args);
+  }
 } 

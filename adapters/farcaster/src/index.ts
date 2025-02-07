@@ -1,4 +1,4 @@
-import { type Client, type IAgentRuntime, elizaLogger } from "@elizaos/core";
+import { type Client, type IAgentRuntime, elizaLogger } from "@hiveai/core";
 import { FarcasterClient } from "./client";
 import { FarcasterPostManager } from "./post";
 import { FarcasterInteractionManager } from "./interactions";
@@ -6,6 +6,7 @@ import { Configuration, NeynarAPIClient } from "@neynar/nodejs-sdk";
 import { validateFarcasterConfig, type FarcasterConfig } from "./environment";
 import { EventEmitter } from 'events';
 import { Logger } from '@hiveai/utils';
+import { MessageBroker, CrossClientMessage } from '@hiveai/messaging';
 
 /**
  * A manager that orchestrates all Farcaster operations:
@@ -39,7 +40,7 @@ class FarcasterManager {
             farcasterConfig,
         });
 
-        elizaLogger.success("Farcaster Neynar client initialized.");
+        Logger.success("Farcaster Neynar client initialized.");
 
         this.posts = new FarcasterPostManager(
             this.client,
@@ -69,7 +70,7 @@ export const FarcasterClientInterface: Client = {
     async start(runtime: IAgentRuntime) {
         const farcasterConfig = await validateFarcasterConfig(runtime);
 
-        elizaLogger.log("Farcaster client started");
+        Logger.log("Farcaster client started");
 
         const manager = new FarcasterManager(runtime, farcasterConfig);
 
@@ -82,21 +83,133 @@ export const FarcasterClientInterface: Client = {
     async stop(runtime: IAgentRuntime) {
         try {
             // stop it
-            elizaLogger.log("Stopping farcaster client", runtime.agentId);
+            Logger.log("Stopping farcaster client", runtime.agentId);
             if (runtime.clients.farcaster) {
                 await runtime.clients.farcaster.stop();
             }
         } catch (e) {
-            elizaLogger.error("client-farcaster interface stop error", e);
+            Logger.error("client-farcaster interface stop error", e);
         }
     },
 };
 
 export default FarcasterClientInterface;
 
+export interface FarcasterConfig {
+    apiKey: string;
+    username: string;
+    messageBroker?: {
+        url: string;
+        exchange: string;
+    };
+}
+
 export class FarcasterAdapter extends EventEmitter {
-    constructor() {
+    private client: FarcasterClient;
+    private messageBroker?: MessageBroker;
+    private readonly config: FarcasterConfig;
+
+    constructor(config: FarcasterConfig) {
         super();
-        Logger.info('Farcaster adapter initialized');
+        this.config = config;
+        this.client = new FarcasterClient(config);
+
+        // Initialize RabbitMQ if config provided
+        if (config.messageBroker) {
+            this.messageBroker = new MessageBroker({
+                url: config.messageBroker.url,
+                exchange: config.messageBroker.exchange,
+                clientId: 'farcaster'
+            });
+            this.setupMessageBroker();
+        }
+    }
+
+    private setupMessageBroker(): void {
+        if (!this.messageBroker) return;
+        this.messageBroker.on('message', this.handleCrossClientMessage.bind(this));
+    }
+
+    private async handleCrossClientMessage(message: CrossClientMessage): Promise<void> {
+        if (!this.messageBroker) return;
+
+        try {
+            switch (message.type) {
+                case 'MESSAGE':
+                    await this.handleIncomingMessage(message);
+                    break;
+                case 'ALERT':
+                    await this.handleAlert(message);
+                    break;
+                case 'NOTIFICATION':
+                    await this.handleNotification(message);
+                    break;
+                case 'COMMAND':
+                    await this.handleCommand(message);
+                    break;
+            }
+        } catch (error) {
+            Logger.error('Error handling cross-client message:', error);
+        }
+    }
+
+    private async handleIncomingMessage(message: CrossClientMessage): Promise<void> {
+        // Handle cross-platform messages, maybe create casts
+        if (message.payload.content && this.shouldCast(message)) {
+            await this.client.cast(message.payload.content);
+        }
+    }
+
+    private shouldCast(message: CrossClientMessage): boolean {
+        // Implement logic to determine if a cross-platform message should be cast
+        return false;
+    }
+
+    private async handleAlert(message: CrossClientMessage): Promise<void> {
+        // Handle platform-wide alerts
+    }
+
+    private async handleNotification(message: CrossClientMessage): Promise<void> {
+        // Handle cross-platform notifications
+    }
+
+    private async handleCommand(message: CrossClientMessage): Promise<void> {
+        // Handle cross-platform commands
+    }
+
+    async start(): Promise<void> {
+        try {
+            // Connect to RabbitMQ if configured
+            if (this.messageBroker) {
+                await this.messageBroker.connect();
+            }
+
+            await this.client.connect();
+            Logger.info('Farcaster adapter started successfully');
+        } catch (error) {
+            Logger.error('Failed to start Farcaster adapter:', error);
+            throw error;
+        }
+    }
+
+    async stop(): Promise<void> {
+        if (this.messageBroker) {
+            await this.messageBroker.disconnect();
+        }
+        await this.client.disconnect();
+        Logger.info('Farcaster adapter stopped');
+    }
+
+    async broadcastMessage(content: string): Promise<void> {
+        if (!this.messageBroker) return;
+
+        await this.messageBroker.publish({
+            source: 'farcaster',
+            type: 'MESSAGE',
+            payload: {
+                content,
+                timestamp: Date.now()
+            }
+        });
     }
 }
