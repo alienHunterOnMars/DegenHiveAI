@@ -1,6 +1,6 @@
 import { Client, Events, GatewayIntentBits, Partials } from "discord.js";
 import { EventEmitter } from "events";
-import { Logger } from "../../utils/logger";
+import { Logger } from "@hiveai/utils";
 import { MessageHandler } from "./handlers/messageHandler";
 import { AnnouncementHandler } from "./handlers/announcementHandler";
 import { CommunityHandler } from "./handlers/communityHandler";
@@ -68,16 +68,6 @@ export class DiscordAdapter extends EventEmitter {
             if (message.author.bot) return;
             
             try {
-                // Emit message event for external handlers
-                this.emit("message", {
-                    id: message.id,
-                    content: message.content,
-                    author: message.author.id,
-                    channelId: message.channelId,
-                    guildId: message.guildId,
-                    timestamp: message.createdTimestamp
-                });
-
                 // Handle message based on context
                 if (message.channelId === this.config.announcementChannelId) {
                     await this.announcementHandler.handleMessage(message);
@@ -101,7 +91,7 @@ export class DiscordAdapter extends EventEmitter {
     private setupMessageBroker(): void {
         if (!this.messageBroker) return;
         
-        this.messageBroker.on('message', this.handleCrossClientMessage.bind(this));
+        // (this.messageBroker as unknown as EventEmitter).on('message', this.handleCrossClientMessage.bind(this));
     }
 
     private async handleCrossClientMessage(message: CrossClientMessage): Promise<void> {
@@ -210,12 +200,12 @@ export class DiscordAdapter extends EventEmitter {
         if (!this.messageBroker) return;
 
         await this.messageBroker.publish({
-            source: 'discord',
             type: 'MESSAGE',
             payload: {
                 content,
                 timestamp: Date.now()
-            }
+            },
+            timestamp: Date.now()
         });
     }
 } 

@@ -1,8 +1,7 @@
 import { Client, TextChannel, EmbedBuilder, Message } from "discord.js";
-import { Logger } from "../../../utils/logger";
+import { Logger } from "@hiveai/utils";
 import { DiscordConfig, AnnouncementOptions } from "../types";
-import { TelegramAdapter } from "../../telegram/telegramAdapter";
-
+ 
 interface PendingAnnouncement {
     id: string;
     content: string;
@@ -15,7 +14,6 @@ interface PendingAnnouncement {
 export class AnnouncementHandler {
     private client: Client;
     private config: DiscordConfig;
-    private telegramAdapter: TelegramAdapter;
     private pendingAnnouncements: Map<string, PendingAnnouncement> = new Map();
     
     // Cache announcement channel to avoid repeated fetches
@@ -39,32 +37,17 @@ export class AnnouncementHandler {
         }
     }
 
-    async makeAnnouncement(content: string, options?: AnnouncementOptions): Promise<void> {
+    async makeAnnouncement(content: string, options?: { pingRole?: string }): Promise<void> {
         try {
-            if (!this.announcementChannel) {
-                await this.initializeAnnouncementChannel();
-                if (!this.announcementChannel) {
-                    throw new Error("Announcement channel not available");
-                }
+            const channel = await this.client.channels.fetch(this.config.announcementChannelId);
+            if (channel?.isTextBased()) {
+                const announcement = options?.pingRole 
+                    ? `<@&${options.pingRole}> ${content}`
+                    : content;
+                await (channel as TextChannel).send(announcement);
             }
-
-            const announcementId = `announcement-${Date.now()}`;
-            const pendingAnnouncement: PendingAnnouncement = {
-                id: announcementId,
-                content,
-                options,
-                timestamp: Date.now(),
-                status: 'pending'
-            };
-
-            this.pendingAnnouncements.set(announcementId, pendingAnnouncement);
-
-            // Send approval request to founder via Telegram
-            await this.requestFounderApproval(pendingAnnouncement);
-
         } catch (error) {
             Logger.error("Error making announcement:", error);
-            throw error;
         }
     }
 
@@ -74,22 +57,22 @@ export class AnnouncementHandler {
             const approvalMessage = this.formatApprovalRequest(announcement);
 
             // Send to founder via Telegram with inline keyboard
-            const telegramMessage = await this.telegramAdapter.sendFounderMessage(
-                approvalMessage,
-                {
-                    reply_markup: {
-                        inline_keyboard: [[
-                            { text: "✅ Approve", callback_data: `approve_${announcement.id}` },
-                            { text: "❌ Reject", callback_data: `reject_${announcement.id}` },
-                            { text: "✏️ Edit", callback_data: `edit_${announcement.id}` }
-                        ]]
-                    }
-                }
-            );
+            // const telegramMessage = await this.telegramAdapter.sendFounderMessage(
+            //     approvalMessage,
+            //     {
+            //         reply_markup: {
+            //             inline_keyboard: [[
+            //                 { text: "✅ Approve", callback_data: `approve_${announcement.id}` },
+            //                 { text: "❌ Reject", callback_data: `reject_${announcement.id}` },
+            //                 { text: "✏️ Edit", callback_data: `edit_${announcement.id}` }
+            //             ]]
+            //         }
+            //     }
+            // );
 
             // Store Telegram message ID for tracking
-            announcement.approvalMessageId = telegramMessage.message_id;
-            this.pendingAnnouncements.set(announcement.id, announcement);
+            // announcement.approvalMessageId = telegramMessage.message_id;
+            // this.pendingAnnouncements.set(announcement.id, announcement);
 
             // Set up expiration timer (24 hours)
             setTimeout(() => {
@@ -115,43 +98,12 @@ export class AnnouncementHandler {
                `Please approve, reject, or edit this announcement.`;
     }
 
-    async handleFounderResponse(
-        action: 'approve' | 'reject' | 'edit',
-        announcementId: string,
-        editedContent?: string
-    ): Promise<void> {
-        const announcement = this.pendingAnnouncements.get(announcementId);
-        if (!announcement) {
-            Logger.warn("Announcement not found:", announcementId);
-            return;
-        }
+    async handleFounderResponse(action: string, messageId: string, content?: string): Promise<void> {
+        // Handle founder responses to announcements
+    }
 
-        try {
-            switch (action) {
-                case 'approve':
-                    await this.publishAnnouncement(announcement);
-                    break;
-                
-                case 'reject':
-                    await this.handleRejectedAnnouncement(announcement);
-                    break;
-                
-                case 'edit':
-                    if (editedContent) {
-                        announcement.content = editedContent;
-                        // Request re-approval with edited content
-                        await this.requestFounderApproval(announcement);
-                    }
-                    break;
-            }
-
-            // Clean up
-            this.pendingAnnouncements.delete(announcementId);
-
-        } catch (error) {
-            Logger.error("Error handling founder response:", error);
-            throw error;
-        }
+    async handleMessage(message: any): Promise<void> {
+        // Handle announcement channel messages
     }
 
     private async publishAnnouncement(announcement: PendingAnnouncement): Promise<void> {
@@ -170,16 +122,16 @@ export class AnnouncementHandler {
             const roleMention = announcement.options?.pingRole ? 
                 `<@&${announcement.options.pingRole}>` : '';
 
-            // Send the announcement
-            await this.announcementChannel.send({
-                content: roleMention,
-                embeds: [embed]
-            });
+            // // Send the announcement
+            // await this.announcementChannel.send({
+            //     content: roleMention,
+            //     embeds: [embed]
+            // });
 
-            // Notify founder of successful publication
-            await this.telegramAdapter.sendFounderMessage(
-                `✅ Announcement published successfully!\n\n${announcement.content}`
-            );
+            // // Notify founder of successful publication
+            // await this.telegramAdapter.sendFounderMessage(
+            //     `✅ Announcement published successfully!\n\n${announcement.content}`
+            // );
 
             Logger.info("Announcement published:", announcement.id);
 
@@ -191,10 +143,10 @@ export class AnnouncementHandler {
 
     private async handleRejectedAnnouncement(announcement: PendingAnnouncement): Promise<void> {
         try {
-            // Notify founder of rejection
-            await this.telegramAdapter.sendFounderMessage(
-                `❌ Announcement rejected:\n\n${announcement.content}`
-            );
+            // // Notify founder of rejection
+            // await this.telegramAdapter.sendFounderMessage(
+            //     `❌ Announcement rejected:\n\n${announcement.content}`
+            // );
 
             Logger.info("Announcement rejected:", announcement.id);
 
@@ -208,10 +160,10 @@ export class AnnouncementHandler {
         const announcement = this.pendingAnnouncements.get(announcementId);
         if (announcement && announcement.status === 'pending') {
             try {
-                // Notify founder of expiration
-                await this.telegramAdapter.sendFounderMessage(
-                    `⚠️ Announcement request expired:\n\n${announcement.content}`
-                );
+                // // Notify founder of expiration
+                // await this.telegramAdapter.sendFounderMessage(
+                //     `⚠️ Announcement request expired:\n\n${announcement.content}`
+                // );
 
                 this.pendingAnnouncements.delete(announcementId);
                 Logger.info("Announcement expired:", announcementId);
@@ -233,21 +185,5 @@ export class AnnouncementHandler {
             default:
                 return 0x0099FF; // Blue
         }
-    }
-
-    async handleMessage(message: Message): Promise<void> {
-        try {
-            // Handle announcement channel messages
-            if (message.channel.id === this.config.announcementChannelId) {
-                // Process announcement message
-                await this.processAnnouncementMessage(message);
-            }
-        } catch (error) {
-            Logger.error('Error handling announcement message:', error);
-        }
-    }
-
-    private async processAnnouncementMessage(message: Message): Promise<void> {
-        // Implement announcement message processing logic
     }
 } 

@@ -1,4 +1,5 @@
-import { Logger } from "../../../utils/logger";
+import { Client } from "discord.js";
+import { Logger } from "@hiveai/utils";
 import { DragonbeeState, DragonbeePersonality, InteractionResponse } from "../types";
 
 interface DragonbeeInteractionContext {
@@ -13,7 +14,7 @@ export class DragonbeeInteractionManager {
     private interactionContexts: Map<string, DragonbeeInteractionContext> = new Map();
     private readonly MAX_HISTORY_LENGTH = 10;
 
-    constructor() {
+    constructor(private client: Client) {
         // Initialize any required connections or state
     }
 
@@ -163,7 +164,7 @@ export class DragonbeeInteractionManager {
             });
         }
 
-        return this.interactionContexts.get(contextKey);
+        return this.interactionContexts.get(contextKey) as DragonbeeInteractionContext;
     }
 
     private async generateResponse(
@@ -204,6 +205,14 @@ export class DragonbeeInteractionManager {
             
         } catch (error) {
             Logger.error("Error updating dragonbee state:", error);
+        }
+    }
+
+    async handleInteraction(interaction: any): Promise<void> {
+        try {
+            Logger.info("Handling dragonbee interaction");
+        } catch (error) {
+            Logger.error("Error handling dragonbee interaction:", error);
         }
     }
 } 

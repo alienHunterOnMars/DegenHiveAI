@@ -12,8 +12,8 @@
         "forceConsistentCasingInFileNames": true,
         "resolveJsonModule": true,
         "declaration": true,
-        "composite": true,
-        "incremental": true,
+        "declarationMap": true,
+        "sourceMap": true,
         "baseUrl": ".",
         "paths": {
             "@hiveAI/core": ["core/src"],

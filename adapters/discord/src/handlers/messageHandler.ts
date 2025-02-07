@@ -1,24 +1,27 @@
 import { Client, Message, TextChannel } from "discord.js";
-import { Logger } from "../../../utils/logger";
+import { Logger } from "@hiveai/utils";
 import { DragonbeeInteractionManager } from "./dragonbeeInteractionManager";
-import { MessageTemplates } from "../templates/messageTemplates";
-import { MessageUtils } from "../utils/messageUtils";
+// import { MessageTemplates } from "../templates/messageTemplates";
+// import { MessageUtils } from "../utils/messageUtils";
 
 export class MessageHandler {
     private client: Client;
     private dragonbeeManager: DragonbeeInteractionManager;
-    private templates: MessageTemplates;
-    private utils: MessageUtils;
+    // private templates: MessageTemplates;
+    // private utils: MessageUtils;
 
     constructor(client: Client) {
         this.client = client;
-        this.dragonbeeManager = new DragonbeeInteractionManager();
-        this.templates = new MessageTemplates();
-        this.utils = new MessageUtils();
+        this.dragonbeeManager = new DragonbeeInteractionManager(client);
+        // this.templates = new MessageTemplates();
+        // this.utils = new MessageUtils();
     }
 
     async handleMessage(message: Message): Promise<void> {
         try {
+            // Basic message handling logic
+            Logger.info(`Handling message: ${message.content}`);
+
             // Skip processing if message is from a bot or system
             if (message.author.bot || message.system) return;
 
@@ -48,25 +51,25 @@ export class MessageHandler {
             }
 
             // Process message content for commands/intents
-            const intent = await this.utils.detectMessageIntent(message.content);
+            // const intent = await this.utils.detectMessageIntent(message.content);
 
-            switch (intent.type) {
-                case "TRADE":
-                    await this.handleTradeCommand(message, intent.data);
-                    break;
+            // switch (intent.type) {
+            //     case "TRADE":
+            //         await this.handleTradeCommand(message, intent.data);
+            //         break;
 
-                case "DRAGONBEE_INTERACTION":
-                    await this.handleDragonbeeInteraction(message, userDragonbees);
-                    break;
+            //     case "DRAGONBEE_INTERACTION":
+            //         await this.handleDragonbeeInteraction(message, userDragonbees);
+            //         break;
 
-                case "HELP":
-                    await this.sendHelpMessage(message);
-                    break;
+            //     case "HELP":
+            //         await this.sendHelpMessage(message);
+            //         break;
 
-                default:
-                    // Default to dragonbee chat interaction
-                    await this.handleDragonbeeInteraction(message, userDragonbees);
-            }
+            //     default:
+            //         // Default to dragonbee chat interaction
+            //         await this.handleDragonbeeInteraction(message, userDragonbees);
+            // }
 
         } catch (error) {
             Logger.error("Error handling direct message:", error);
@@ -76,29 +79,29 @@ export class MessageHandler {
 
     private async handleChannelMessage(message: Message): Promise<void> {
         try {
-            // Check if message mentions the bot
-            const isBotMentioned = message.mentions.users.has(this.client.user.id);
+            // // Check if message mentions the bot
+            // const isBotMentioned = message.mentions.users.has(this.client.user.id);
 
-            // Get channel context
-            const channelContext = await this.utils.getChannelContext(message.channel as TextChannel);
+            // // Get channel context
+            // const channelContext = await this.utils.getChannelContext(message.channel as TextChannel);
 
-            if (isBotMentioned) {
-                await this.handleBotMention(message, channelContext);
-                return;
-            }
+            // if (isBotMentioned) {
+            //     await this.handleBotMention(message, channelContext);
+            //     return;
+            // }
 
-            // Track message for engagement metrics
-            await this.utils.trackEngagement({
-                userId: message.author.id,
-                channelId: message.channelId,
-                messageType: "CHANNEL",
-                timestamp: message.createdTimestamp
-            });
+            // // Track message for engagement metrics
+            // await this.utils.trackEngagement({
+            //     userId: message.author.id,
+            //     channelId: message.channelId,
+            //     messageType: "CHANNEL",
+            //     timestamp: message.createdTimestamp
+            // });
 
-            // Randomly engage in community conversations (configurable probability)
-            if (await this.shouldEngageInConversation(channelContext)) {
-                await this.generateCommunityResponse(message, channelContext);
-            }
+            // // Randomly engage in community conversations (configurable probability)
+            // if (await this.shouldEngageInConversation(channelContext)) {
+            //     await this.generateCommunityResponse(message, channelContext);
+            // }
 
         } catch (error) {
             Logger.error("Error handling channel message:", error);
@@ -107,8 +110,8 @@ export class MessageHandler {
 
     private async handleBotMention(message: Message, context: any): Promise<void> {
         try {
-            const response = await this.templates.generateMentionResponse(message.content, context);
-            await message.reply(response);
+            // const response = await this.templates.generateMentionResponse(message.content, context);
+            // await message.reply(response);
         } catch (error) {
             Logger.error("Error handling bot mention:", error);
             await this.sendErrorResponse(message);
@@ -124,12 +127,12 @@ export class MessageHandler {
 
     private async handleDragonbeeInteraction(message: Message, dragonbees: any[]): Promise<void> {
         try {
-            const response = await this.dragonbeeManager.processInteraction(
-                message.content,
-                dragonbees,
-                message.author.id
-            );
-            await message.reply(response);
+            // const response = await this.dragonbeeManager.processInteraction(
+            //     message.content,
+            //     dragonbees,
+            //     message.author.id
+            // );
+            // await message.reply(response);
         } catch (error) {
             Logger.error("Error in dragonbee interaction:", error);
             await this.sendErrorResponse(message);
@@ -148,27 +151,27 @@ export class MessageHandler {
 
     private async generateCommunityResponse(message: Message, context: any): Promise<void> {
         try {
-            const response = await this.templates.generateCommunityResponse(message.content, context);
-            await message.channel.send(response);
+            // const response = await this.templates.generateCommunityResponse(message.content, context);
+            // await message.channel.send(response);
         } catch (error) {
             Logger.error("Error generating community response:", error);
         }
     }
 
     private async sendNoDragonbeesMessage(message: Message): Promise<void> {
-        const response = await this.templates.getNoDragonbeesMessage();
-        await message.reply(response);
+        // const response = await this.templates.getNoDragonbeesMessage();
+        // await message.reply(response);
     }
 
     private async sendHelpMessage(message: Message): Promise<void> {
-        const response = await this.templates.getHelpMessage();
-        await message.reply(response);
+        // const response = await this.templates.getHelpMessage();
+        // await message.reply(response);
     }
 
     private async sendErrorResponse(message: Message): Promise<void> {
         try {
-            const response = await this.templates.getErrorMessage();
-            await message.reply(response);
+            // const response = await this.templates.getErrorMessage();
+            // await message.reply(response);
         } catch (error) {
             Logger.error("Error sending error response:", error);
         }

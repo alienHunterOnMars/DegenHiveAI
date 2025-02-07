@@ -1,7 +1,7 @@
 import { Client, Message, MessageReaction, User, TextChannel, EmbedBuilder } from "discord.js";
-import { Logger } from "../../../utils/logger";
+import { Logger } from "@hiveai/utils";
 import { EngagementMetrics, CommunityStats } from "../types";
-import { OpenAIService } from "../../../services/openAIService";
+// import { OpenAIService } from "@hiveai/services";
 
 interface EngagementConfig {
     minTimeBetweenMessages: number;  // Minimum time between bot messages (ms)
@@ -14,7 +14,7 @@ interface EngagementConfig {
 
 export class CommunityHandler {
     private client: Client;
-    private openAI: OpenAIService;
+    // private openAI: OpenAIService;
     private lastMessageTime: Map<string, number> = new Map();
     private dailyMessageCount: Map<string, number> = new Map();
     private activeDiscussions: Map<string, string[]> = new Map();
@@ -31,7 +31,7 @@ export class CommunityHandler {
 
     constructor(client: Client) {
         this.client = client;
-        this.openAI = new OpenAIService();
+        // this.openAI = new OpenAIService();
         this.setupDailyReset();
     }
 
@@ -58,14 +58,7 @@ export class CommunityHandler {
 
     async handleReaction(reaction: MessageReaction, user: User): Promise<void> {
         try {
-            // Track reaction metrics
-            await this.updateReactionMetrics(reaction, user);
-
-            // Check if this reaction indicates high engagement
-            if (await this.isHighEngagementReaction(reaction)) {
-                await this.handleHighEngagementReaction(reaction);
-            }
-
+            Logger.info(`Handling reaction from ${user.tag}`);
         } catch (error) {
             Logger.error("Error handling reaction:", error);
         }
@@ -144,22 +137,22 @@ export class CommunityHandler {
             const recentMessages = await this.getRecentMessages(message.channel as TextChannel);
 
             // Generate response using OpenAI
-            const response = await this.openAI.generateCommunityResponse(
-                message.content,
-                channelContext,
-                recentMessages
-            );
+            // const response = await this.openAI.generateCommunityResponse(
+            //     message.content,
+            //     channelContext,
+            //     recentMessages
+            // );
 
-            if (response) {
-                await message.channel.send(response);
+            // if (response) {
+            //     await message.channel.send(response);
                 
-                // Update tracking
-                this.lastMessageTime.set(message.channelId, Date.now());
-                this.dailyMessageCount.set(
-                    message.channelId,
-                    (this.dailyMessageCount.get(message.channelId) || 0) + 1
-                );
-            }
+            //     // Update tracking
+            //     this.lastMessageTime.set(message.channelId, Date.now());
+            //     this.dailyMessageCount.set(
+            //         message.channelId,
+            //         (this.dailyMessageCount.get(message.channelId) || 0) + 1
+            //     );
+            // }
 
         } catch (error) {
             Logger.error("Error generating community response:", error);
@@ -205,13 +198,14 @@ export class CommunityHandler {
     private async generateRevivalMessage(topics: string[]): Promise<string> {
         // Use OpenAI to generate a natural conversation revival message
         const prompt = `Generate an engaging message to revive a conversation about: ${topics.join(", ")}`;
-        return await this.openAI.generateText(prompt);
+        // return await this.openAI.generateText(prompt);
+        return "";
     }
 
     private async detectTopics(content: string): Promise<string[]> {
         // Use OpenAI to detect topics from message content
-        const topics = await this.openAI.detectTopics(content);
-        return topics;
+        // const topics = await this.openAI.detectTopics(content);
+        return [];
     }
 
     private isTopicRelevant(topic: string): boolean {
@@ -268,5 +262,15 @@ export class CommunityHandler {
             topTopics,
             lastActivity: new Date(metrics.lastActivity)
         };
+    }
+
+    private async getChannelContext(channel: TextChannel): Promise<any> {
+        // Get channel context like recent messages, active topics, etc.
+        return {};
+    }
+
+    private async getRecentMessages(channel: TextChannel): Promise<any[]> {
+        // Get recent messages from the channel
+        return [];
     }
 } 
