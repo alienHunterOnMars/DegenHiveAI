@@ -12,11 +12,11 @@ import {
     ModelClass,
     type State,
     stringToUuid,
-    elizaLogger,
     getEmbeddingZeroVector,
     type IImageDescriptionService,
     ServiceType
-} from "@elizaos/core";
+} from "@hiveai/core";
+import { Logger } from "@hiveai/utils";
 import type { ClientBase } from "./base";
 import { buildConversationThread, sendTweet, wait } from "./utils.ts";
 
@@ -116,7 +116,7 @@ export class TwitterInteractionClient {
     }
 
     async handleTwitterInteractions() {
-        elizaLogger.log("Checking Twitter interactions");
+        Logger.log("Checking Twitter interactions");
 
         const twitterUsername = this.client.profile.username;
         try {
@@ -129,7 +129,7 @@ export class TwitterInteractionClient {
                 )
             ).tweets;
 
-            elizaLogger.log(
+            Logger.log(
                 "Completed checking mentioned tweets:",
                 mentionCandidates.length
             );
@@ -139,7 +139,7 @@ export class TwitterInteractionClient {
                 const TARGET_USERS =
                     this.client.twitterConfig.TWITTER_TARGET_USERS;
 
-                elizaLogger.log("Processing target users:", TARGET_USERS);
+                Logger.log("Processing target users:", TARGET_USERS);
 
                 if (TARGET_USERS.length > 0) {
                     // Create a map to store tweets by user
@@ -166,7 +166,7 @@ export class TwitterInteractionClient {
                                     Date.now() - tweet.timestamp * 1000 <
                                     2 * 60 * 60 * 1000;
 
-                                elizaLogger.log(`Tweet ${tweet.id} checks:`, {
+                                Logger.log(`Tweet ${tweet.id} checks:`, {
                                     isUnprocessed,
                                     isRecent,
                                     isReply: tweet.isReply,
@@ -183,12 +183,12 @@ export class TwitterInteractionClient {
 
                             if (validTweets.length > 0) {
                                 tweetsByUser.set(username, validTweets);
-                                elizaLogger.log(
+                                Logger.log(
                                     `Found ${validTweets.length} valid tweets from ${username}`
                                 );
                             }
                         } catch (error) {
-                            elizaLogger.error(
+                            Logger.error(
                                 `Error fetching tweets for ${username}:`,
                                 error
                             );
@@ -206,7 +206,7 @@ export class TwitterInteractionClient {
                                     Math.floor(Math.random() * tweets.length)
                                 ];
                             selectedTweets.push(randomTweet);
-                            elizaLogger.log(
+                            Logger.log(
                                 `Selected tweet from ${username}: ${randomTweet.text?.substring(0, 100)}`
                             );
                         }
@@ -219,7 +219,7 @@ export class TwitterInteractionClient {
                     ];
                 }
             } else {
-                elizaLogger.log(
+                Logger.log(
                     "No target users configured, processing only mentions"
                 );
             }
@@ -247,12 +247,12 @@ export class TwitterInteractionClient {
                         );
 
                     if (existingResponse) {
-                        elizaLogger.log(
+                        Logger.log(
                             `Already responded to tweet ${tweet.id}, skipping`
                         );
                         continue;
                     }
-                    elizaLogger.log("New Tweet found", tweet.permanentUrl);
+                    Logger.log("New Tweet found", tweet.permanentUrl);
 
                     const roomId = stringToUuid(
                         tweet.conversationId + "-" + this.runtime.agentId
@@ -300,9 +300,9 @@ export class TwitterInteractionClient {
             // Save the latest checked tweet ID to the file
             await this.client.cacheLatestCheckedTweetId();
 
-            elizaLogger.log("Finished checking Twitter interactions");
+            Logger.log("Finished checking Twitter interactions");
         } catch (error) {
-            elizaLogger.error("Error handling Twitter interactions:", error);
+            Logger.error("Error handling Twitter interactions:", error);
         }
     }
 
@@ -322,11 +322,11 @@ export class TwitterInteractionClient {
         }
 
         if (!message.content.text) {
-            elizaLogger.log("Skipping Tweet with no text", tweet.id);
+            Logger.log("Skipping Tweet with no text", tweet.id);
             return { text: "", action: "IGNORE" };
         }
 
-        elizaLogger.log("Processing Tweet: ", tweet.id);
+        Logger.log("Processing Tweet: ", tweet.id);
         const formatTweet = (tweet: Tweet) => {
             return `  ID: ${tweet.id}
   From: ${tweet.name} (@${tweet.username})
@@ -360,7 +360,7 @@ export class TwitterInteractionClient {
             }
         } catch (error) {
     // Handle the error
-    elizaLogger.error("Error Occured during describing image: ", error);
+    Logger.error("Error Occured during describing image: ", error);
 }
 
 
@@ -382,7 +382,7 @@ export class TwitterInteractionClient {
             await this.runtime.messageManager.getMemoryById(tweetId);
 
         if (!tweetExists) {
-            elizaLogger.log("tweet does not exist, saving");
+            Logger.log("tweet does not exist, saving");
             const userIdUUID = stringToUuid(tweet.userId as string);
             const roomId = stringToUuid(tweet.conversationId);
 
@@ -429,7 +429,7 @@ export class TwitterInteractionClient {
 
         // Promise<"RESPOND" | "IGNORE" | "STOP" | null> {
         if (shouldRespond !== "RESPOND") {
-            elizaLogger.log("Not responding to message");
+            Logger.log("Not responding to message");
             return { text: "Response Decision:", action: shouldRespond };
         }
 
@@ -477,7 +477,7 @@ export class TwitterInteractionClient {
 
         if (response.text) {
             if (this.isDryRun) {
-                elizaLogger.info(
+                Logger.info(
                     `Dry run: Selected Post: ${tweet.id} - ${tweet.username}: ${tweet.text}\nAgent's Output:\n${response.text}`
                 );
             } else {
@@ -535,7 +535,7 @@ export class TwitterInteractionClient {
                     );
                     await wait();
                 } catch (error) {
-                    elizaLogger.error(`Error sending response tweet: ${error}`);
+                    Logger.error(`Error sending response tweet: ${error}`);
                 }
             }
         }
@@ -549,19 +549,19 @@ export class TwitterInteractionClient {
         const visited: Set<string> = new Set();
 
         async function processThread(currentTweet: Tweet, depth = 0) {
-            elizaLogger.log("Processing tweet:", {
+            Logger.log("Processing tweet:", {
                 id: currentTweet.id,
                 inReplyToStatusId: currentTweet.inReplyToStatusId,
                 depth: depth,
             });
 
             if (!currentTweet) {
-                elizaLogger.log("No current tweet found for thread building");
+                Logger.log("No current tweet found for thread building");
                 return;
             }
 
             if (depth >= maxReplies) {
-                elizaLogger.log("Reached maximum reply depth", depth);
+                Logger.log("Reached maximum reply depth", depth);
                 return;
             }
 
@@ -612,7 +612,7 @@ export class TwitterInteractionClient {
             }
 
             if (visited.has(currentTweet.id)) {
-                elizaLogger.log("Already visited tweet:", currentTweet.id);
+                Logger.log("Already visited tweet:", currentTweet.id);
                 return;
             }
 
@@ -620,7 +620,7 @@ export class TwitterInteractionClient {
             thread.unshift(currentTweet);
 
             if (currentTweet.inReplyToStatusId) {
-                elizaLogger.log(
+                Logger.log(
                     "Fetching parent tweet:",
                     currentTweet.inReplyToStatusId
                 );
@@ -630,25 +630,25 @@ export class TwitterInteractionClient {
                     );
 
                     if (parentTweet) {
-                        elizaLogger.log("Found parent tweet:", {
+                        Logger.log("Found parent tweet:", {
                             id: parentTweet.id,
                             text: parentTweet.text?.slice(0, 50),
                         });
                         await processThread(parentTweet, depth + 1);
                     } else {
-                        elizaLogger.log(
+                        Logger.log(
                             "No parent tweet found for:",
                             currentTweet.inReplyToStatusId
                         );
                     }
                 } catch (error) {
-                    elizaLogger.log("Error fetching parent tweet:", {
+                    Logger.log("Error fetching parent tweet:", {
                         tweetId: currentTweet.inReplyToStatusId,
                         error,
                     });
                 }
             } else {
-                elizaLogger.log(
+                Logger.log(
                     "Reached end of reply chain at:",
                     currentTweet.id
                 );

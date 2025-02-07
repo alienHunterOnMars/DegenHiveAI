@@ -1,10 +1,10 @@
 import type { Tweet } from "agent-twitter-client";
-import { getEmbeddingZeroVector } from "@elizaos/core";
-import type { Content, Memory, UUID } from "@elizaos/core";
-import { stringToUuid } from "@elizaos/core";
+import { getEmbeddingZeroVector } from "@hiveai/core";
+import type { Content, Memory, UUID } from "@hiveai/core";
+import { stringToUuid } from "@hiveai/core";
 import type { ClientBase } from "./base";
-import { elizaLogger } from "@elizaos/core";
-import type { Media } from "@elizaos/core";
+import { Logger } from "@hiveai/utils";
+import type { Media } from "@hiveai/core";
 import fs from "fs";
 import path from "path";
 import { MediaData } from "./types";
@@ -39,20 +39,20 @@ export async function buildConversationThread(
     const visited: Set<string> = new Set();
 
     async function processThread(currentTweet: Tweet, depth = 0) {
-        elizaLogger.debug("Processing tweet:", {
+        Logger.debug("Processing tweet:", {
             id: currentTweet.id,
             inReplyToStatusId: currentTweet.inReplyToStatusId,
             depth: depth,
         });
 
         if (!currentTweet) {
-            elizaLogger.debug("No current tweet found for thread building");
+            Logger.debug("No current tweet found for thread building");
             return;
         }
 
         // Stop if we've reached our reply limit
         if (depth >= maxReplies) {
-            elizaLogger.debug("Reached maximum reply depth", depth);
+            Logger.debug("Reached maximum reply depth", depth);
             return;
         }
 
@@ -102,14 +102,14 @@ export async function buildConversationThread(
         }
 
         if (visited.has(currentTweet.id)) {
-            elizaLogger.debug("Already visited tweet:", currentTweet.id);
+            Logger.debug("Already visited tweet:", currentTweet.id);
             return;
         }
 
         visited.add(currentTweet.id);
         thread.unshift(currentTweet);
 
-        elizaLogger.debug("Current thread state:", {
+        Logger.debug("Current thread state:", {
             length: thread.length,
             currentDepth: depth,
             tweetId: currentTweet.id,
@@ -117,7 +117,7 @@ export async function buildConversationThread(
 
         // If there's a parent tweet, fetch and process it
         if (currentTweet.inReplyToStatusId) {
-            elizaLogger.debug(
+            Logger.debug(
                 "Fetching parent tweet:",
                 currentTweet.inReplyToStatusId
             );
@@ -127,25 +127,25 @@ export async function buildConversationThread(
                 );
 
                 if (parentTweet) {
-                    elizaLogger.debug("Found parent tweet:", {
+                    Logger.debug("Found parent tweet:", {
                         id: parentTweet.id,
                         text: parentTweet.text?.slice(0, 50),
                     });
                     await processThread(parentTweet, depth + 1);
                 } else {
-                    elizaLogger.debug(
+                    Logger.debug(
                         "No parent tweet found for:",
                         currentTweet.inReplyToStatusId
                     );
                 }
             } catch (error) {
-                elizaLogger.error("Error fetching parent tweet:", {
+                Logger.error("Error fetching parent tweet:", {
                     tweetId: currentTweet.inReplyToStatusId,
                     error,
                 });
             }
         } else {
-            elizaLogger.debug(
+            Logger.debug(
                 "Reached end of reply chain at:",
                 currentTweet.id
             );
@@ -154,7 +154,7 @@ export async function buildConversationThread(
 
     await processThread(tweet, 0);
 
-    elizaLogger.debug("Final thread built:", {
+    Logger.debug("Final thread built:", {
         totalTweets: thread.length,
         tweetIds: thread.map((t) => ({
             id: t.id,
@@ -259,7 +259,7 @@ export async function sendTweet(
             sentTweets.push(finalTweet);
             previousTweetId = finalTweet.id;
         } else {
-            elizaLogger.error("Error sending tweet chunk:", {
+            Logger.error("Error sending tweet chunk:", {
                 chunk,
                 response: body,
             });

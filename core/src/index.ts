@@ -21,3 +21,7 @@ export interface Plugin {
 export * from "./types";
 export * from "./uuid";
 export * from "./parsing";
+export * from "./settings";
+export * from "./embedding";
+export * from "./models";
+export * from "./generation";

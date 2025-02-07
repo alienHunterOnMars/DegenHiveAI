@@ -6,10 +6,10 @@ import {
     type State,
     type UUID,
     getEmbeddingZeroVector,
-    elizaLogger,
     stringToUuid,
     ActionTimelineType,
-} from "@elizaos/core";
+} from "@hiveai/core";
+import { Logger } from "@hiveai/utils";
 import {
     type QueryTweetsResponse,
     Scraper,
@@ -264,16 +264,16 @@ export class ClientBase extends EventEmitter {
         const cachedCookies = await this.getCachedCookies(username);
 
         if (cachedCookies) {
-            elizaLogger.info("Using cached cookies");
+            Logger.info("Using cached cookies");
             await this.setCookiesFromArray(cachedCookies);
         }
 
-        elizaLogger.log("Waiting for Twitter login");
+        Logger.log("Waiting for Twitter login");
         while (retries > 0) {
             try {
                 if (await this.twitterClient.isLoggedIn()) {
                     // cookies are valid, no login required
-                    elizaLogger.info("Successfully logged in.");
+                    Logger.info("Successfully logged in.");
                     break;
                 } else {
                     await this.twitterClient.login(
@@ -284,8 +284,8 @@ export class ClientBase extends EventEmitter {
                     );
                     if (await this.twitterClient.isLoggedIn()) {
                         // fresh login, store new cookies
-                        elizaLogger.info("Successfully logged in.");
-                        elizaLogger.info("Caching cookies");
+                        Logger.info("Successfully logged in.");
+                        Logger.info("Caching cookies");
                         await this.cacheCookies(
                             username,
                             await this.twitterClient.getCookies()
@@ -294,16 +294,16 @@ export class ClientBase extends EventEmitter {
                     }
                 }
             } catch (error) {
-                elizaLogger.error(`Login attempt failed: ${error.message}`);
+                Logger.error(`Login attempt failed: ${error.message}`);
             }
 
             retries--;
-            elizaLogger.error(
+            Logger.error(
                 `Failed to login to Twitter. Retrying... (${retries} attempts left)`
             );
 
             if (retries === 0) {
-                elizaLogger.error(
+                Logger.error(
                     "Max retries reached. Exiting login process."
                 );
                 throw new Error("Twitter login failed after maximum retries.");
@@ -315,8 +315,8 @@ export class ClientBase extends EventEmitter {
         this.profile = await this.fetchProfile(username);
 
         if (this.profile) {
-            elizaLogger.log("Twitter user ID:", this.profile.id);
-            elizaLogger.log(
+            Logger.log("Twitter user ID:", this.profile.id);
+            Logger.log(
                 "Twitter loaded:",
                 JSON.stringify(this.profile, null, 10)
             );
@@ -337,7 +337,7 @@ export class ClientBase extends EventEmitter {
     }
 
     async fetchOwnPosts(count: number): Promise<Tweet[]> {
-        elizaLogger.debug("fetching own posts");
+        Logger.debug("fetching own posts");
         const homeTimeline = await this.twitterClient.getUserTweets(
             this.profile.id,
             count
@@ -353,22 +353,22 @@ export class ClientBase extends EventEmitter {
         count: number,
         following?: boolean
     ): Promise<Tweet[]> {
-        elizaLogger.debug("fetching home timeline");
+        Logger.debug("fetching home timeline");
         const homeTimeline = following
             ? await this.twitterClient.fetchFollowingTimeline(count, [])
             : await this.twitterClient.fetchHomeTimeline(count, []);
 
-        elizaLogger.debug(homeTimeline, { depth: Number.POSITIVE_INFINITY });
+        Logger.debug(homeTimeline, { depth: Number.POSITIVE_INFINITY });
         const processedTimeline = homeTimeline
             .filter((t) => t.__typename !== "TweetWithVisibilityResults") // what's this about?
             .map((tweet) => this.parseTweet(tweet));
 
-        //elizaLogger.debug("process homeTimeline", processedTimeline);
+        //Logger.debug("process homeTimeline", processedTimeline);
         return processedTimeline;
     }
 
     async fetchTimelineForActions(count: number): Promise<Tweet[]> {
-        elizaLogger.debug("fetching timeline for actions");
+        Logger.debug("fetching timeline for actions");
 
         const agentUsername = this.twitterConfig.TWITTER_USERNAME;
 
@@ -416,17 +416,17 @@ export class ClientBase extends EventEmitter {
                 );
                 return (result ?? { tweets: [] }) as QueryTweetsResponse;
             } catch (error) {
-                elizaLogger.error("Error fetching search tweets:", error);
+                Logger.error("Error fetching search tweets:", error);
                 return { tweets: [] };
             }
         } catch (error) {
-            elizaLogger.error("Error fetching search tweets:", error);
+            Logger.error("Error fetching search tweets:", error);
             return { tweets: [] };
         }
     }
 
     private async populateTimeline() {
-        elizaLogger.debug("populating timeline...");
+        Logger.debug("populating timeline...");
 
         const cachedTimeline = await this.getCachedTimeline();
 
@@ -475,7 +475,7 @@ export class ClientBase extends EventEmitter {
 
                 // Save the missing tweets as memories
                 for (const tweet of tweetsToSave) {
-                    elizaLogger.log("Saving Tweet", tweet.id);
+                    Logger.log("Saving Tweet", tweet.id);
 
                     const roomId = stringToUuid(
                         tweet.conversationId + "-" + this.runtime.agentId
@@ -517,7 +517,7 @@ export class ClientBase extends EventEmitter {
                             : undefined,
                     } as Content;
 
-                    elizaLogger.log("Creating memory for tweet", tweet.id);
+                    Logger.log("Creating memory for tweet", tweet.id);
 
                     // check if it already exists
                     const memory =
@@ -526,7 +526,7 @@ export class ClientBase extends EventEmitter {
                         );
 
                     if (memory) {
-                        elizaLogger.log(
+                        Logger.log(
                             "Memory already exists, skipping timeline population"
                         );
                         break;
@@ -545,7 +545,7 @@ export class ClientBase extends EventEmitter {
                     await this.cacheTweet(tweet);
                 }
 
-                elizaLogger.log(
+                Logger.log(
                     `Populated ${tweetsToSave.length} missing tweets from the cache.`
                 );
                 return;
@@ -596,7 +596,7 @@ export class ClientBase extends EventEmitter {
                 )
         );
 
-        elizaLogger.debug({
+        Logger.debug({
             processingTweets: tweetsToSave.map((tweet) => tweet.id).join(","),
         });
 
@@ -609,7 +609,7 @@ export class ClientBase extends EventEmitter {
 
         // Save the new tweets as memories
         for (const tweet of tweetsToSave) {
-            elizaLogger.log("Saving Tweet", tweet.id);
+            Logger.log("Saving Tweet", tweet.id);
 
             const roomId = stringToUuid(
                 tweet.conversationId + "-" + this.runtime.agentId
@@ -690,7 +690,7 @@ export class ClientBase extends EventEmitter {
                 recentMessage.length > 0 &&
                 recentMessage[0].content === message.content
             ) {
-                elizaLogger.debug("Message already saved", recentMessage[0].id);
+                Logger.debug("Message already saved", recentMessage[0].id);
             } else {
                 await this.runtime.messageManager.createMemory({
                     ...message,

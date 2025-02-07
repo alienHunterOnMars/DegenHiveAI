@@ -1,4 +1,4 @@
-import { type Client, elizaLogger, type IAgentRuntime } from "@hiveai/core";
+import { type Client, type IAgentRuntime } from "@hiveai/core";
 import { ClientBase } from "./base";
 import { validateTwitterConfig, type TwitterConfig } from "./environment";
 import { TwitterInteractionClient } from "./interactions";
@@ -34,11 +34,11 @@ class TwitterManager {
 
         // Optional search logic (enabled if TWITTER_SEARCH_ENABLE is true)
         if (twitterConfig.TWITTER_SEARCH_ENABLE) {
-            elizaLogger.warn("Twitter/X client running in a mode that:");
-            elizaLogger.warn("1. violates consent of random users");
-            elizaLogger.warn("2. burns your rate limit");
-            elizaLogger.warn("3. can get your account banned");
-            elizaLogger.warn("use at your own risk");
+            Logger.warn("Twitter/X client running in a mode that:");
+            Logger.warn("1. violates consent of random users");
+            Logger.warn("2. burns your rate limit");
+            Logger.warn("3. can get your account banned");
+            Logger.warn("use at your own risk");
             this.search = new TwitterSearchClient(this.client, runtime);
         }
 
@@ -119,7 +119,7 @@ export const TwitterClientInterface: Client = {
         const twitterConfig: TwitterConfig =
             await validateTwitterConfig(runtime);
 
-        elizaLogger.log("Twitter client started");
+        Logger.log("Twitter client started");
 
         const manager = new TwitterManager(runtime, twitterConfig);
 
@@ -146,7 +146,7 @@ export const TwitterClientInterface: Client = {
     },
 
     async stop(_runtime: IAgentRuntime) {
-        elizaLogger.warn("Twitter client does not support stopping yet");
+        Logger.warn("Twitter client does not support stopping yet");
     },
 };
 
