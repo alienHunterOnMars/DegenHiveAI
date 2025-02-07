@@ -15,26 +15,19 @@
         }
     },
     "files": ["dist"],
+    "scripts": {
+        "build": "tsup src/index.ts --format esm --dts",
+        "dev": "tsup src/index.ts --format esm --dts --watch"
+    },
     "dependencies": {
-        "@hiveai/utils": "workspace:*",
+        "@hiveai/core": "workspace:*",
         "@hiveai/messaging": "workspace:*",
-        "@hiveai/adapters-telegram": "workspace:*", 
-        "snoowrap": "1.23.0",
-        "zod": "3.23.8",
-        "events": "^3.3.0"
+        "@hiveai/utils": "workspace:*",
+        "snoowrap": "^1.23.0"
     },
     "devDependencies": {
         "@types/node": "^20.0.0",
-        "@types/events": "^3.0.3",
-        "@types/snoowrap": "^1.19.0",
         "tsup": "8.3.5",
-        "vitest": "1.1.3",
-        "@vitest/coverage-v8": "1.1.3"
-    },
-    "scripts": {
-        "build": "tsup --format esm --dts",
-        "dev": "tsup --format esm --dts --watch",
-        "test": "vitest run",
-        "test:coverage": "vitest run --coverage"
+        "typescript": "^5.0.0"
     }
 } 

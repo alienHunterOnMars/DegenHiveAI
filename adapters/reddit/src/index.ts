@@ -2,7 +2,7 @@ import Snoowrap from 'snoowrap';
 import { EventEmitter } from 'events';
 import { Logger } from '@hiveai/utils';
 import { MessageBroker, CrossClientMessage } from '@hiveai/messaging';
-import { RedditMessageHandler } from './src/handlers/messageHandler';
+import { RedditMessageHandler } from './handlers/messageHandler';
 import { RedditPostHandler } from './handlers/postHandler';
 import { RedditConfig, RedditPost } from './types';
 
@@ -116,9 +116,12 @@ export class RedditAdapter extends EventEmitter {
     private startPolling(): void {
         this.pollInterval = setInterval(async () => {
             try {
-                await this.checkNewMessages();
-                await this.checkMentions();
-                await this.checkSubredditActivity();
+                const tasks = [
+                    this.checkNewMessages(),
+                    this.checkMentions(),
+                    this.checkSubredditActivity()
+                ];
+                await Promise.all(tasks);
             } catch (error) {
                 Logger.error('Error in Reddit polling:', error);
             }
@@ -164,7 +167,7 @@ export class RedditAdapter extends EventEmitter {
 
     private async checkMentions(): Promise<void> {
         try {
-            const mentions = await this.client.getNewMentions();
+            const mentions = await this.client.getUnreadMessages().filter(m => m.was_comment);
             for (const mention of mentions) {
                 await this.messageHandler.handleMention(mention);
             }
@@ -201,10 +204,10 @@ export class RedditAdapter extends EventEmitter {
         if (!this.messageBroker) return;
 
         await this.messageBroker.publish({
-            source: 'reddit',
             type: 'MESSAGE',
             payload: {
                 content,
+                source: 'reddit',
                 timestamp: Date.now()
             }
         });
