@@ -12,13 +12,14 @@
  * can be implemented as plugins and registered via the PLUGINS environment variable.
  */
 
-import { AgentOrchestrator } from "./services/agentOrchestrator";
-// import { TelegramAdapter } from "@hiveai/adapters-telegram";
 import { DiscordAdapter } from "@hiveai/adapters-discord";
-import { TradeExecutionService } from "./services/tradeExecutionService";
-import { DragonbeeModule } from "./modules/dragonbeeModule";
-import { EventBus } from "./infrastructure/eventBus";
 import { Logger } from "./utils/logger";
+import { readFileSync } from 'fs';
+import { TelegramAdapter } from '@hiveai/adapters-telegram';
+import { RedditAdapter } from '@hiveai/adapters-reddit';
+import { TwitterAdapter } from '@hiveai/adapters-twitter';
+import { FarcasterAdapter } from '@hiveai/adapters-farcaster';
+import { EmailAdapter } from '@hiveai/adapters-email';
 
 // ----------------------------------------------------------------------------
 // Plugin Interfaces and Manager
@@ -92,146 +93,94 @@ class PluginManager {
 // Core Startup Logic
 // ----------------------------------------------------------------------------
 
-async function startHiveSwarm() {
-    try {
-        Logger.info("Starting DegenHive AI Swarm...");
-
-        // Initialize core infrastructure
-        const eventBus = new EventBus();
-
-        // Set up the Plugin Manager to load additional capabilities
-        const pluginManager = new PluginManager();
-        await pluginManager.loadPlugins();
-
-        // Shared context passed on to plugins; plugins can access core services or modify config
-        const sharedContext = {
-            eventBus,
-            config: process.env,
-        };
-
-        // Initialize all loaded plugins (e.g., extra message adapters, extended logging, or AI enhancements).
-        await pluginManager.initializePlugins(sharedContext);
-
-        // Initialize communication adapters using basic configuration.
-        // Plugins may contribute alternative implementations or augment these instances.
-        const telegramAdapter = new TelegramAdapter({
-            token: process.env.TELEGRAM_BOT_TOKEN || "",
-            founderChatId: process.env.TELEGRAM_FOUNDER_CHAT_ID || "",
-            groupChatId: process.env.TELEGRAM_GROUP_CHAT_ID || "",
-        });
-
-        const discordAdapter = new DiscordAdapter({
-            token: process.env.DISCORD_BOT_TOKEN || "",
-            guildId: process.env.DISCORD_GUILD_ID || "",
-            announcementChannelId: process.env.DISCORD_ANNOUNCEMENT_CHANNEL_ID || "",
-        });
-
-        // Instantiate core services
-        const tradeExecutionService = new TradeExecutionService({
-            // Pass any required configuration for trade execution, order monitoring, etc.
-        });
-
-        const dragonbeeModule = new DragonbeeModule({
-            memoryStore: {}, // Can be extended later with persistent or RL-based memory
-        });
-
-        // Build main agent orchestrator that ties communication, trade service, and role-play modules together.
-        const agentOrchestrator = new AgentOrchestrator({
-            eventBus,
-            tradeService: tradeExecutionService,
-            telegramAdapter,
-            discordAdapter,
-            dragonbeeModule,
-        });
-
-        // Register incoming message listeners for Telegram and Discord.
-        telegramAdapter.on("message", async (msg) => {
-            try {
-                await agentOrchestrator.handleTelegramMessage(msg);
-            } catch (error) {
-                Logger.error("Error processing Telegram message", error);
-            }
-        });
-
-        discordAdapter.on("message", async (msg) => {
-            try {
-                await agentOrchestrator.handleDiscordMessage(msg);
-            } catch (error) {
-                Logger.error("Error processing Discord message", error);
-            }
-        });
-
-        // Start additional plugins (for example, extra analytics, advanced adaptation layers, etc.)
-        await pluginManager.startPlugins(sharedContext);
-
-        // Start the communication adapters; they open the connections to respective platforms.
-        await telegramAdapter.start();
-        await discordAdapter.start();
-
-        // Start the trade execution service
-        tradeExecutionService.start();
-
-        // Start the agent orchestrator to initialize agents and routing
-        await agentOrchestrator.start();
-
-        // If a direct client (for REST or socket endpoint) is used for further interaction,
-        // you can attach helper methods (for instance, to dynamically create direct-chat agents)
-        const directClient: any = {}; // Replace with your actual DirectClient instance if needed
-        directClient.startAgent = async (character: any) => {
-            // Plugins can further extend or enhance the starting sequence for an individual agent.
-            return agentOrchestrator.startAgent(character, directClient);
-        };
-
-        // Find an available port dynamically (if a server component is required).
-        let serverPort = Number.parseInt(process.env.SERVER_PORT || "3000");
-        while (!(await checkPortAvailable(serverPort))) {
-            Logger.warn(`Port ${serverPort} is in use, trying ${serverPort + 1}`);
-            serverPort++;
-        }
-        // If you implement a DirectClient server or API layer, start it here.
-        // For example: await directClient.start(serverPort);
-
-        Logger.info(`DegenHive AI Swarm started successfully on port ${serverPort}!`);
-    } catch (error) {
-        Logger.error("Unhandled error starting DegenHive AI Swarm:", error);
-        process.exit(1);
-    }
+interface HiveConfig {
+    discord: any;
+    telegram: any;
+    reddit: any;
+    twitter: any;
+    farcaster: any;
+    email: any;
 }
 
-/**
- * Utility function to check if a TCP port is available.
- * Returns true if available, false if in use.
- */
-const checkPortAvailable = (port: number): Promise<boolean> => {
-    return new Promise((resolve) => {
-        const net = require("net");
-        const server = net.createServer();
+class HiveSwarm {
+    private config: HiveConfig;
+    private adapters: Map<string, any> = new Map();
 
-        server.once("error", (err: any) => {
-            if (err.code === "EADDRINUSE") {
-                resolve(false);
-            } else {
-                resolve(false);
-            }
+    constructor() {
+        // Load configuration
+        const configPath = process.env.CONFIG_PATH || './configenv.json';
+        this.config = JSON.parse(readFileSync(configPath, 'utf-8'));
+    }
+
+    async start() {
+        try {
+            Logger.info('Starting HiveAI Swarm...');
+
+            // Initialize Discord adapter
+            const discordAdapter = new DiscordAdapter(this.config.discord);
+            this.adapters.set('discord', discordAdapter);
+
+            // Initialize Telegram adapter
+            const telegramAdapter = new TelegramAdapter(this.config.telegram);
+            this.adapters.set('telegram', telegramAdapter);
+
+            // Initialize Reddit adapter
+            const redditAdapter = new RedditAdapter(this.config.reddit);
+            this.adapters.set('reddit', redditAdapter);
+
+            // Initialize Twitter adapter
+            const twitterAdapter = new TwitterAdapter(this.config.twitter);
+            this.adapters.set('twitter', twitterAdapter);
+
+            // Initialize Farcaster adapter
+            const farcasterAdapter = new FarcasterAdapter(this.config.farcaster);
+            this.adapters.set('farcaster', farcasterAdapter);
+
+            // Initialize Email adapter
+            const emailAdapter = new EmailAdapter(this.config.email);
+            this.adapters.set('email', emailAdapter);
+
+            // Start all adapters
+            await Promise.all([...this.adapters.values()].map(adapter => adapter.start()));
+
+            Logger.success('HiveAI Swarm started successfully!');
+
+            // Handle shutdown
+            this.setupShutdownHandlers();
+
+        } catch (error) {
+            Logger.error('Failed to start HiveAI Swarm:', error);
+            process.exit(1);
+        }
+    }
+
+    private setupShutdownHandlers() {
+        const shutdown = async () => {
+            Logger.info('Shutting down HiveAI Swarm...');
+            
+            // Stop all adapters
+            await Promise.all([...this.adapters.values()].map(adapter => adapter.stop()));
+            
+            Logger.success('HiveAI Swarm shutdown complete');
+            process.exit(0);
+        };
+
+        // Handle graceful shutdown
+        process.on('SIGTERM', shutdown);
+        process.on('SIGINT', shutdown);
+        process.on('uncaughtException', (error) => {
+            Logger.error('Uncaught exception:', error);
+            shutdown();
         });
-
-        server.once("listening", () => {
-            server.close();
-            resolve(true);
-        });
-
-        server.listen(port);
-    });
-};
+    }
+}
 
 // ----------------------------------------------------------------------------
 // Start the AI Swarm and set up process-level error handlers
 // ----------------------------------------------------------------------------
 
-startHiveSwarm().catch((error) => {
-    Logger.error("Unhandled error in startHiveSwarm:", error);
-    process.exit(1);
-});
+const hiveSwarm = new HiveSwarm();
+hiveSwarm.start();
 
 // Optionally prevent unhandled exceptions from crashing the process
 if (process.env.PREVENT_UNHANDLED_EXIT === "true") {

@@ -8,7 +8,7 @@
         "dev": "turbo run dev",
         "test": "turbo run test",
         "lint": "eslint .",
-        "start": "tsx start_hive_swarm.ts",
+        "start": "CONFIG_PATH=./configenv.json tsx start_hive_swarm.ts",
         "start:prod": "node dist/start_hive_swarm.js"
     },
     "dependencies": {
