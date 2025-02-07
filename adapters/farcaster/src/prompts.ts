@@ -2,7 +2,7 @@ import {
     type Character,
     messageCompletionFooter,
     shouldRespondFooter,
-} from "@elizaos/core";
+} from "@hiveai/core";
 import type { Cast } from "./types";
 
 export const formatCast = (cast: Cast) => {

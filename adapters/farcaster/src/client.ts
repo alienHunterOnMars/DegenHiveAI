@@ -1,4 +1,4 @@
-import { type IAgentRuntime, elizaLogger } from "@elizaos/core";
+import { type IAgentRuntime, elizaLogger } from "@hiveai/core";
 import { type NeynarAPIClient, isApiErrorResponse } from "@neynar/nodejs-sdk";
 import type { NeynarCastResponse, Cast, Profile, FidRequest, CastId } from "./types";
 import type { FarcasterConfig } from "./environment";

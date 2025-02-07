@@ -20,10 +20,11 @@
 	"dependencies": {
 		"@hiveai/utils": "workspace:*",
 		"@hiveai/messaging": "workspace:*",
+		"@hiveai/core": "workspace:*",
 		"@farcaster/hub-nodejs": "^0.10.0",
 		"@neynar/nodejs-sdk": "^2.0.3",
-		"zod": "3.23.8",
-		"events": "^3.3.0"
+		"viem": "^2.0.0",
+		"zod": "3.23.8"
 	},
 	"devDependencies": {
 		"@types/node": "^20.0.0",

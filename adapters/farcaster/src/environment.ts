@@ -2,7 +2,7 @@ import {
     parseBooleanFromText,
     type IAgentRuntime,
     ActionTimelineType,
-} from "@elizaos/core";
+} from "@hiveai/core";
 import { z, ZodError } from "zod";
 
 export const DEFAULT_MAX_CAST_LENGTH = 320;
