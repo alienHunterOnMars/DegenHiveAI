@@ -7,4 +7,5 @@ export default defineConfig({
     clean: true,
     format: ["esm"], // Ensure you're targeting CommonJS
     external: ["nodemailer", "mail-notifier", "z"],
+    dts: true,
 });
