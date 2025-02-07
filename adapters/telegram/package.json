@@ -17,6 +17,7 @@
     "files": ["dist"],
     "dependencies": {
         "@hiveai/utils": "workspace:*",
+        "@hiveai/messaging": "workspace:*",
         "node-telegram-bot-api": "^0.64.0",
         "telegraf": "^4.15.3",
         "zod": "3.23.8",

@@ -5,6 +5,10 @@ export interface DiscordConfig {
     alphaChannelId: string;
     communityChannelId: string;
     moderatorRoleId: string;
+    messageBroker?: {
+        url: string;
+        exchange: string;
+    };
 }
 
 export interface DiscordMessage {

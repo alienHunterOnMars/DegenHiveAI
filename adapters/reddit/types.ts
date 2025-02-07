@@ -5,6 +5,10 @@ export interface RedditConfig {
     monitoredSubreddits: string[];
     autoReplyEnabled: boolean;
     postApprovalRequired: boolean;
+    messageBroker?: {
+        url: string;
+        exchange: string;
+    };
 }
 
 export interface RedditPost {

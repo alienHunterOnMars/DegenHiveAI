@@ -1,23 +1,22 @@
 import Snoowrap from 'snoowrap';
 import { EventEmitter } from 'events';
-import { Logger } from '../../utils/logger';
+import { Logger } from '@hiveai/utils';
+import { MessageBroker, CrossClientMessage } from '@hiveai/messaging';
 import { RedditMessageHandler } from './src/handlers/messageHandler';
 import { RedditPostHandler } from './handlers/postHandler';
 import { RedditConfig, RedditPost } from './types';
-import { TelegramAdapter } from '@hiveai/adapters-telegram';
 
 export class RedditAdapter extends EventEmitter {
     private client: Snoowrap;
     private messageHandler: RedditMessageHandler;
     private postHandler: RedditPostHandler;
     private config: RedditConfig;
-    private telegramAdapter: TelegramAdapter;
+    private messageBroker?: MessageBroker;
     private pollInterval: NodeJS.Timeout;
 
-    constructor(config: RedditConfig, telegramAdapter: TelegramAdapter) {
+    constructor(config: RedditConfig) {
         super();
         this.config = config;
-        this.telegramAdapter = telegramAdapter;
 
         // Initialize Reddit client
         this.client = new Snoowrap({
@@ -29,7 +28,7 @@ export class RedditAdapter extends EventEmitter {
 
         // Initialize handlers
         this.messageHandler = new RedditMessageHandler(this.client);
-        this.postHandler = new RedditPostHandler(this.client, this.telegramAdapter);
+        this.postHandler = new RedditPostHandler(this.client);
 
         // Configure client
         this.client.config({
@@ -37,10 +36,69 @@ export class RedditAdapter extends EventEmitter {
             continueAfterRatelimitError: true,
             retryErrorCodes: [502, 503, 504, 522]
         });
+
+        // Initialize RabbitMQ if config provided
+        if (config.messageBroker) {
+            this.messageBroker = new MessageBroker({
+                url: config.messageBroker.url,
+                exchange: config.messageBroker.exchange,
+                clientId: 'reddit'
+            });
+            this.setupMessageBroker();
+        }
+    }
+
+    private setupMessageBroker(): void {
+        if (!this.messageBroker) return;
+        this.messageBroker.on('message', this.handleCrossClientMessage.bind(this));
+    }
+
+    private async handleCrossClientMessage(message: CrossClientMessage): Promise<void> {
+        if (!this.messageBroker) return;
+
+        try {
+            switch (message.type) {
+                case 'MESSAGE':
+                    await this.handleIncomingMessage(message);
+                    break;
+                case 'ALERT':
+                    await this.handleAlert(message);
+                    break;
+                case 'NOTIFICATION':
+                    await this.handleNotification(message);
+                    break;
+                case 'COMMAND':
+                    await this.handleCommand(message);
+                    break;
+            }
+        } catch (error) {
+            Logger.error('Error handling cross-client message:', error);
+        }
+    }
+
+    private async handleIncomingMessage(message: CrossClientMessage): Promise<void> {
+        // Handle cross-platform messages, maybe post to specific subreddits
+    }
+
+    private async handleAlert(message: CrossClientMessage): Promise<void> {
+        // Handle alerts from other platforms
+    }
+
+    private async handleNotification(message: CrossClientMessage): Promise<void> {
+        // Handle notifications from other platforms
+    }
+
+    private async handleCommand(message: CrossClientMessage): Promise<void> {
+        // Handle cross-platform commands
     }
 
     async start(): Promise<void> {
         try {
+            // Connect to RabbitMQ if configured
+            if (this.messageBroker) {
+                await this.messageBroker.connect();
+            }
+
             // Verify credentials
             const me = await this.client.getMe();
             Logger.info(`Reddit bot logged in as u/${me.name}`);
@@ -132,7 +190,23 @@ export class RedditAdapter extends EventEmitter {
     }
 
     async stop(): Promise<void> {
+        if (this.messageBroker) {
+            await this.messageBroker.disconnect();
+        }
         clearInterval(this.pollInterval);
         Logger.info('Reddit adapter stopped');
+    }
+
+    async broadcastMessage(content: string): Promise<void> {
+        if (!this.messageBroker) return;
+
+        await this.messageBroker.publish({
+            source: 'reddit',
+            type: 'MESSAGE',
+            payload: {
+                content,
+                timestamp: Date.now()
+            }
+        });
     }
 } 

@@ -1,16 +1,13 @@
 import Snoowrap from 'snoowrap';
-import { Logger } from '../../../utils/logger';
+import { Logger } from '@hiveai/utils';
 import { PendingPost, RedditPost } from '../types';
-import { TelegramAdapter } from '../../telegram/telegramAdapter';
 
 export class RedditPostHandler {
     private client: Snoowrap;
-    private telegramAdapter: TelegramAdapter;
     private pendingPosts: Map<string, PendingPost> = new Map();
 
-    constructor(client: Snoowrap, telegramAdapter: TelegramAdapter) {
+    constructor(client: Snoowrap ) {
         this.client = client;
-        this.telegramAdapter = telegramAdapter;
     }
 
     async submitPost(post: RedditPost): Promise<void> {
@@ -36,26 +33,11 @@ export class RedditPostHandler {
         try {
             const approvalMessage = this.formatApprovalRequest(post);
             
-            const telegramMessage = await this.telegramAdapter.sendFounderMessage(
-                approvalMessage,
-                {
-                    reply_markup: {
-                        inline_keyboard: [[
-                            { text: "✅ Approve", callback_data: `reddit_approve_${post.id}` },
-                            { text: "❌ Reject", callback_data: `reddit_reject_${post.id}` },
-                            { text: "✏️ Edit", callback_data: `reddit_edit_${post.id}` }
-                        ]]
-                    }
-                }
-            );
-
-            post.approvalMessageId = telegramMessage.message_id;
+            // Store the pending post
             this.pendingPosts.set(post.id, post);
 
-            // Set expiration
-            setTimeout(() => {
-                this.handlePostExpiration(post.id);
-            }, 24 * 60 * 60 * 1000); // 24 hours
+            // Set expiration timer
+            setTimeout(() => this.handlePostExpiration(post.id), 24 * 60 * 60 * 1000);
 
         } catch (error) {
             Logger.error('Error requesting post approval:', error);
@@ -128,10 +110,10 @@ export class RedditPostHandler {
                 await submission.selectFlair({ text: post.flair });
             }
 
-            await this.telegramAdapter.sendFounderMessage(
-                `✅ Reddit post published successfully!\n` +
-                `https://reddit.com${submission.permalink}`
-            );
+            // await this.telegramAdapter.sendFounderMessage(
+            //     `✅ Reddit post published successfully!\n` +
+            //     `https://reddit.com${submission.permalink}`
+            // );
 
             Logger.info('Reddit post published:', submission.id);
 
@@ -142,22 +124,22 @@ export class RedditPostHandler {
     }
 
     private async handleRejectedPost(post: PendingPost): Promise<void> {
-        await this.telegramAdapter.sendFounderMessage(
-            `❌ Reddit post rejected:\n\n` +
-            `Subreddit: r/${post.subreddit}\n` +
-            `Title: ${post.title}`
-        );
+            // await this.telegramAdapter.sendFounderMessage(
+            //     `❌ Reddit post rejected:\n\n` +
+            //     `Subreddit: r/${post.subreddit}\n` +
+            //     `Title: ${post.title}`
+            // );
         Logger.info('Reddit post rejected:', post.id);
     }
 
     private async handlePostExpiration(postId: string): Promise<void> {
         const post = this.pendingPosts.get(postId);
         if (post?.status === 'pending') {
-            await this.telegramAdapter.sendFounderMessage(
-                `⚠️ Reddit post request expired:\n\n` +
-                `Subreddit: r/${post.subreddit}\n` +
-                `Title: ${post.title}`
-            );
+            // await this.telegramAdapter.sendFounderMessage(
+            //     `⚠️ Reddit post request expired:\n\n` +
+            //     `Subreddit: r/${post.subreddit}\n` +
+            //     `Title: ${post.title}`
+            // );
             this.pendingPosts.delete(postId);
             Logger.info('Reddit post expired:', postId);
         }

@@ -1,4 +1,4 @@
-import { Client, TextChannel, EmbedBuilder } from "discord.js";
+import { Client, TextChannel, EmbedBuilder, Message } from "discord.js";
 import { Logger } from "../../../utils/logger";
 import { DiscordConfig, AnnouncementOptions } from "../types";
 import { TelegramAdapter } from "../../telegram/telegramAdapter";
@@ -21,11 +21,9 @@ export class AnnouncementHandler {
     // Cache announcement channel to avoid repeated fetches
     private announcementChannel: TextChannel | null = null;
 
-    constructor(client: Client, config: DiscordConfig, telegramAdapter: TelegramAdapter) {
+    constructor(client: Client, config: DiscordConfig) {
         this.client = client;
         this.config = config;
-        this.telegramAdapter = telegramAdapter;
-        this.initializeAnnouncementChannel();
     }
 
     private async initializeAnnouncementChannel(): Promise<void> {
@@ -235,5 +233,21 @@ export class AnnouncementHandler {
             default:
                 return 0x0099FF; // Blue
         }
+    }
+
+    async handleMessage(message: Message): Promise<void> {
+        try {
+            // Handle announcement channel messages
+            if (message.channel.id === this.config.announcementChannelId) {
+                // Process announcement message
+                await this.processAnnouncementMessage(message);
+            }
+        } catch (error) {
+            Logger.error('Error handling announcement message:', error);
+        }
+    }
+
+    private async processAnnouncementMessage(message: Message): Promise<void> {
+        // Implement announcement message processing logic
     }
 } 

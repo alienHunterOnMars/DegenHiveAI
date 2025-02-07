@@ -19,6 +19,7 @@
 	],
 	"dependencies": {
 		"@hiveai/utils": "workspace:*",
+		"@hiveai/messaging": "workspace:*",
 		"agent-twitter-client": "0.0.18",
 		"zod": "3.23.8",
 		"events": "^3.3.0"
