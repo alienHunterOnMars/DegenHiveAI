@@ -1,3 +1,4 @@
+import type { Comment, PrivateMessage, Submission } from 'snoowrap';
 import Snoowrap from 'snoowrap';
 import { EventEmitter } from 'events';
 import { Logger } from '@hiveai/utils';
@@ -36,22 +37,9 @@ export class RedditAdapter extends EventEmitter {
             continueAfterRatelimitError: true,
             retryErrorCodes: [502, 503, 504, 522]
         });
-
-        // Initialize RabbitMQ if config provided
-        if (config.messageBroker) {
-            this.messageBroker = new MessageBroker({
-                url: config.messageBroker.url,
-                exchange: config.messageBroker.exchange,
-                clientId: 'reddit'
-            });
-            this.setupMessageBroker();
-        }
     }
 
-    private setupMessageBroker(): void {
-        if (!this.messageBroker) return;
-        this.messageBroker.on('message', this.handleCrossClientMessage.bind(this));
-    }
+ 
 
     private async handleCrossClientMessage(message: CrossClientMessage): Promise<void> {
         if (!this.messageBroker) return;
@@ -100,7 +88,7 @@ export class RedditAdapter extends EventEmitter {
             }
 
             // Verify credentials
-            const me = await this.client.getMe();
+            const me = await Promise.resolve(this.client.getMe() as any);
             Logger.info(`Reddit bot logged in as u/${me.name}`);
 
             // Start polling for new messages and mentions
@@ -144,7 +132,7 @@ export class RedditAdapter extends EventEmitter {
 
     async replyToComment(commentId: string, response: string): Promise<void> {
         try {
-            const comment = await this.client.getComment(commentId);
+            const comment = await Promise.resolve(this.client.getComment(commentId) as any);
             await comment.reply(response);
             Logger.info(`Replied to comment ${commentId}`);
         } catch (error) {
@@ -155,7 +143,7 @@ export class RedditAdapter extends EventEmitter {
 
     private async checkNewMessages(): Promise<void> {
         try {
-            const messages = await this.client.getUnreadMessages();
+            const messages = await (async () => this.client.getUnreadMessages())();
             for (const message of messages) {
                 await this.messageHandler.handleMessage(message);
             }
@@ -167,7 +155,10 @@ export class RedditAdapter extends EventEmitter {
 
     private async checkMentions(): Promise<void> {
         try {
-            const mentions = await this.client.getUnreadMessages().filter(m => m.was_comment);
+            const messages = await (async () => this.client.getUnreadMessages())() as (Comment | PrivateMessage)[];
+            const mentions = messages.filter(
+                (message): message is Comment => 'body' in message && 'author' in message && 'parent_id' in message
+            );
             for (const mention of mentions) {
                 await this.messageHandler.handleMention(mention);
             }
@@ -200,16 +191,5 @@ export class RedditAdapter extends EventEmitter {
         Logger.info('Reddit adapter stopped');
     }
 
-    async broadcastMessage(content: string): Promise<void> {
-        if (!this.messageBroker) return;
-
-        await this.messageBroker.publish({
-            type: 'MESSAGE',
-            payload: {
-                content,
-                source: 'reddit',
-                timestamp: Date.now()
-            }
-        });
-    }
+ 
 } 
