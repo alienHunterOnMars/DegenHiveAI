@@ -20,7 +20,7 @@ import { MessageBroker, CrossClientMessage } from '@hiveai/messaging';
 class TwitterManager {
     client: ClientBase;
     post: TwitterPostClient;
-    search: TwitterSearchClient;
+    search?: TwitterSearchClient;
     interaction: TwitterInteractionClient;
     space?: TwitterSpaceClient;
     private messageBroker?: MessageBroker;
@@ -63,7 +63,7 @@ class TwitterManager {
 
     private setupMessageBroker(): void {
         if (!this.messageBroker) return;
-        this.messageBroker.on('message', this.handleCrossClientMessage.bind(this));
+        (this.messageBroker as any).subscribe('message', this.handleCrossClientMessage.bind(this));
     }
 
     private async handleCrossClientMessage(message: CrossClientMessage): Promise<void> {
@@ -92,7 +92,7 @@ class TwitterManager {
     private async handleIncomingMessage(message: CrossClientMessage): Promise<void> {
         // Optionally create tweets from cross-platform messages
         if (message.payload.content && this.shouldTweet(message)) {
-            await this.client.tweet(message.payload.content);
+            await (this.client as any).tweet(message.payload.content);
         }
     }
 
@@ -153,14 +153,14 @@ export const TwitterClientInterface: Client = {
 export default TwitterClientInterface;
 
 export class TwitterAdapter extends EventEmitter {
-    private client: TwitterClient;
+    private client: TwitterPostClient;
     private messageBroker?: MessageBroker;
-    private readonly config: TwitterConfig;
+    private readonly config: any;
 
     constructor(config: TwitterConfig) {
         super();
-        this.config = config;
-        this.client = new TwitterClient(config);
+        this.config  = config;
+        this.client = new TwitterPostClient((config as any), null);
 
         // Initialize RabbitMQ if config provided
         if (config.messageBroker) {
@@ -175,7 +175,7 @@ export class TwitterAdapter extends EventEmitter {
 
     private setupMessageBroker(): void {
         if (!this.messageBroker) return;
-        this.messageBroker.on('message', this.handleCrossClientMessage.bind(this));
+        (this.messageBroker as any).subscribe('message', this.handleCrossClientMessage.bind(this));
     }
 
     private async handleCrossClientMessage(message: CrossClientMessage): Promise<void> {
@@ -204,7 +204,7 @@ export class TwitterAdapter extends EventEmitter {
     private async handleIncomingMessage(message: CrossClientMessage): Promise<void> {
         // Optionally create tweets from cross-platform messages
         if (message.payload.content && this.shouldTweet(message)) {
-            await this.client.tweet(message.payload.content);
+            await (this.client as any).tweet(message.payload.content);
         }
     }
 
@@ -248,16 +248,5 @@ export class TwitterAdapter extends EventEmitter {
         Logger.info('Twitter adapter stopped');
     }
 
-    async broadcastMessage(content: string): Promise<void> {
-        if (!this.messageBroker) return;
-
-        await this.messageBroker.publish({
-            source: 'twitter',
-            type: 'MESSAGE',
-            payload: {
-                content,
-                timestamp: Date.now()
-            }
-        });
-    }
+ 
 }

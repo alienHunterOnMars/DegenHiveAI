@@ -1,6 +1,6 @@
 import {
     type IAgentRuntime,
-    composeContext,
+    // composeContext,
     generateText,
     ModelClass,
     ServiceType,
@@ -16,7 +16,7 @@ import {
     IdleMonitorPlugin,
     type SpeakerRequest,
 } from "agent-twitter-client";
-import { SttTtsPlugin } from "./plugins/SttTtsSpacesPlugin.ts";
+import { SttTtsPlugin } from "./plugins/SttTtsSpacesPlugin";
 import { Logger } from "@hiveai/utils";
 
 interface CurrentSpeakerState {
@@ -30,21 +30,26 @@ interface CurrentSpeakerState {
  * Generate short filler text via GPT
  */
 async function generateFiller(
-    runtime: IAgentRuntime,
+    runtime: any,
     fillerType: string
 ): Promise<string> {
     try {
-        const context = composeContext({
-            state: { fillerType },
-            template: `
-# INSTRUCTIONS:
-You are generating a short filler message for a Twitter Space. The filler type is "{{fillerType}}".
-Keep it brief, friendly, and relevant. No more than two sentences.
-Only return the text, no additional formatting.
+//         const context = composeContext({
+//             state: { fillerType },
+//             template: `
+// # INSTRUCTIONS:
+// You are generating a short filler message for a Twitter Space. The filler type is "{{fillerType}}".
+// Keep it brief, friendly, and relevant. No more than two sentences.
+// Only return the text, no additional formatting.
 
----
-`,
-        });
+// ---
+// `,
+//         });
+
+        const context = "";
+
+
+        
         const output = await generateText({
             runtime,
             context,
@@ -61,7 +66,7 @@ Only return the text, no additional formatting.
  * Speak a filler message if STT/TTS plugin is available. Sleep a bit after TTS to avoid cutoff.
  */
 async function speakFiller(
-    runtime: IAgentRuntime,
+    runtime: any,
     sttTtsPlugin: SttTtsPlugin | undefined,
     fillerType: string,
     sleepAfterMs = 3000
@@ -82,21 +87,22 @@ async function speakFiller(
  * Generate topic suggestions via GPT if no topics are configured
  */
 async function generateTopicsIfEmpty(
-    runtime: IAgentRuntime
+    runtime: any
 ): Promise<string[]> {
     try {
-        const context = composeContext({
-            state: {},
-            template: `
-# INSTRUCTIONS:
-Please generate 5 short topic ideas for a Twitter Space about technology or random interesting subjects.
-Return them as a comma-separated list, no additional formatting or numbering.
+//         const context = composeContext({
+//             state: {},
+//             template: `
+// # INSTRUCTIONS:
+// Please generate 5 short topic ideas for a Twitter Space about technology or random interesting subjects.
+// Return them as a comma-separated list, no additional formatting or numbering.
 
-Example:
-"AI Advances, Futuristic Gadgets, Space Exploration, Quantum Computing, Digital Ethics"
----
-`,
-        });
+// Example:
+// "AI Advances, Futuristic Gadgets, Space Exploration, Quantum Computing, Digital Ethics"
+// ---
+// `,
+//         });
+        const context = "";
         const response = await generateText({
             runtime,
             context,
@@ -117,7 +123,7 @@ Example:
  * Main class: manage a Twitter Space with N speakers max, speaker queue, filler messages, etc.
  */
 export class TwitterSpaceClient {
-    private runtime: IAgentRuntime;
+    private runtime: any;
     private client: ClientBase;
     private scraper: Scraper;
     private isSpaceRunning = false;
@@ -136,7 +142,7 @@ export class TwitterSpaceClient {
 
     private decisionOptions: TwitterSpaceDecisionOptions;
 
-    constructor(client: ClientBase, runtime: IAgentRuntime) {
+    constructor(client: ClientBase, runtime: any) {
         this.client = client;
         this.scraper = client.twitterClient;
         this.runtime = runtime;
@@ -313,7 +319,7 @@ export class TwitterSpaceClient {
                     voiceId: this.decisionOptions.voiceId,
                     sttLanguage: this.decisionOptions.sttLanguage,
                     transcriptionService:
-                        this.client.runtime.getService<ITranscriptionService>(
+                        (this.client.runtime as any).getService(
                             ServiceType.TRANSCRIPTION
                         ),
                 });
@@ -348,15 +354,15 @@ export class TwitterSpaceClient {
             );
 
             // Events
-            this.currentSpace.on("occupancyUpdate", (update) => {
+            (this.currentSpace as any).on("occupancyUpdate", (update: any) => {
                 Logger.log(
                     `[Space] Occupancy => ${update.occupancy} participant(s).`
                 );
             });
 
-            this.currentSpace.on(
+            (this.currentSpace as any).on(
                 "speakerRequest",
-                async (req: SpeakerRequest) => {
+                async (req: any) => {
                     Logger.log(
                         `[Space] Speaker request from @${req.username} (${req.userId}).`
                     );
@@ -364,7 +370,7 @@ export class TwitterSpaceClient {
                 }
             );
 
-            this.currentSpace.on("idleTimeout", async (info) => {
+            (this.currentSpace as any).on("idleTimeout", async (info: any) => {
                 Logger.log(
                     `[Space] idleTimeout => no audio for ${info.idleMs} ms.`
                 );

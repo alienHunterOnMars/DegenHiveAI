@@ -4,7 +4,7 @@ import { spawn } from "child_process";
 import {
     type ITranscriptionService,
     stringToUuid,
-    composeContext,
+    // composeContext,
     getEmbeddingZeroVector,
     generateMessageResponse,
     ModelClass,
@@ -14,7 +14,7 @@ import {
     type Plugin,
     type UUID,
     type State,
-    composeRandomUser,
+    // composeRandomUser,
     generateShouldRespond,
 } from "@hiveai/core";
 import { Logger } from "@hiveai/utils";
@@ -58,9 +58,14 @@ const SILENCE_DETECTION_THRESHOLD_MS = 1000; // 1-second silence threshold
 export class SttTtsPlugin implements Plugin {
     name = "SttTtsPlugin";
     description = "Speech-to-text (OpenAI) + conversation + TTS (ElevenLabs)";
-    private runtime: IAgentRuntime;
-    private client: ClientBase;
-    private spaceId: string;
+    clients = [];
+    actions = [];
+    evaluators = [];
+    services = [];
+    
+    private runtime: any;
+    private client: any;
+    private spaceId!: string;
 
     private space?: Space;
     private janus?: JanusClient;
@@ -74,7 +79,7 @@ export class SttTtsPlugin implements Plugin {
         content: string;
     }> = [];
 
-    private transcriptionService: ITranscriptionService;
+    private transcriptionService: any;
 
     /**
      * userId => arrayOfChunks (PCM Int16)
@@ -92,7 +97,7 @@ export class SttTtsPlugin implements Plugin {
     private isProcessingAudio = false;
 
     private userSpeakingTimer: NodeJS.Timeout | null = null;
-    private volumeBuffers: Map<string, number[]>;
+    private volumeBuffers: Map<string, number[]> = new Map();
     private ttsAbortController: AbortController | null = null;
 
     onAttach(_space: Space) {
@@ -457,13 +462,14 @@ export class SttTtsPlugin implements Plugin {
             return "";
         }
 
-        const context = composeContext({
-            state,
-            template:
-                this.runtime.character.templates?.twitterVoiceHandlerTemplate ||
-                this.runtime.character.templates?.messageHandlerTemplate ||
-                twitterVoiceHandlerTemplate,
-        });
+        // const context = composeContext({
+        //     state,
+        //     template:
+        //         this.runtime.character.templates?.twitterVoiceHandlerTemplate ||
+        //         this.runtime.character.templates?.messageHandlerTemplate ||
+        //         twitterVoiceHandlerTemplate,
+        // });
+        const context = "";
 
         const responseContent = await this._generateResponse(memory, context);
 
@@ -491,7 +497,7 @@ export class SttTtsPlugin implements Plugin {
     private async _generateResponse(
         message: Memory,
         context: string,
-    ): Promise<Content> {
+    ): Promise<any> {
         const { userId, roomId } = message;
 
         const response = await generateMessageResponse({
@@ -583,14 +589,15 @@ export class SttTtsPlugin implements Plugin {
         }
 
         // If none of the above conditions are met, use the generateText to decide
-        const shouldRespondContext = composeContext({
-            state,
-            template:
-                this.runtime.character.templates
-                    ?.twitterShouldRespondTemplate ||
-                this.runtime.character.templates?.shouldRespondTemplate ||
-                composeRandomUser(twitterShouldRespondTemplate, 2),
-        });
+        // const shouldRespondContext = composeContext({
+        //     state,
+        //     template:
+        //         this.runtime.character.templates
+        //             ?.twitterShouldRespondTemplate ||
+        //         this.runtime.character.templates?.shouldRespondTemplate ||
+        //         composeRandomUser(twitterShouldRespondTemplate, 2),
+        // });
+        const shouldRespondContext = "";
 
         const response = await generateShouldRespond({
             runtime: this.runtime,

@@ -75,6 +75,12 @@ export const twitterEnvSchema = z.object({
     ACTION_TIMELINE_TYPE: z
         .nativeEnum(ActionTimelineType)
         .default(ActionTimelineType.ForYou),
+    messageBroker: z
+        .object({
+            url: z.string(),
+            exchange: z.string(),
+        })
+        .optional(),
 });
 
 export type TwitterConfig = z.infer<typeof twitterEnvSchema>;
@@ -119,7 +125,8 @@ export async function validateTwitterConfig(
             TWITTER_DRY_RUN:
                 parseBooleanFromText(
                     runtime.getSetting("TWITTER_DRY_RUN") ||
-                        process.env.TWITTER_DRY_RUN
+                        process.env.TWITTER_DRY_RUN ||
+                        ""
                 ) ?? false, // parseBooleanFromText return null if "", map "" to false
 
             TWITTER_USERNAME:
@@ -144,7 +151,8 @@ export async function validateTwitterConfig(
             TWITTER_SEARCH_ENABLE:
                 parseBooleanFromText(
                     runtime.getSetting("TWITTER_SEARCH_ENABLE") ||
-                        process.env.TWITTER_SEARCH_ENABLE
+                        process.env.TWITTER_SEARCH_ENABLE ||
+                        ""
                 ) ?? false,
 
             // string passthru
@@ -191,7 +199,8 @@ export async function validateTwitterConfig(
             ENABLE_ACTION_PROCESSING:
                 parseBooleanFromText(
                     runtime.getSetting("ENABLE_ACTION_PROCESSING") ||
-                        process.env.ENABLE_ACTION_PROCESSING
+                        process.env.ENABLE_ACTION_PROCESSING ||
+                        ""
                 ) ?? false,
 
             // init in minutes (min 1m)
@@ -205,13 +214,15 @@ export async function validateTwitterConfig(
             POST_IMMEDIATELY:
                 parseBooleanFromText(
                     runtime.getSetting("POST_IMMEDIATELY") ||
-                        process.env.POST_IMMEDIATELY
+                        process.env.POST_IMMEDIATELY ||
+                        ""
                 ) ?? false,
 
             TWITTER_SPACES_ENABLE:
                 parseBooleanFromText(
                     runtime.getSetting("TWITTER_SPACES_ENABLE") ||
-                        process.env.TWITTER_SPACES_ENABLE
+                        process.env.TWITTER_SPACES_ENABLE ||
+                        ""
                 ) ?? false,
 
             MAX_ACTIONS_PROCESSING: safeParseInt(
@@ -222,7 +233,17 @@ export async function validateTwitterConfig(
 
             ACTION_TIMELINE_TYPE:
                 runtime.getSetting("ACTION_TIMELINE_TYPE") ||
-                process.env.ACTION_TIMELINE_TYPE,
+                process.env.ACTION_TIMELINE_TYPE ||
+                "",
+
+            messageBroker: {
+                url: runtime.getSetting("messageBroker.url") ||
+                    process.env.MESSAGE_BROKER_URL ||
+                    "",
+                exchange: runtime.getSetting("messageBroker.exchange") ||
+                    process.env.MESSAGE_BROKER_EXCHANGE ||
+                    "",
+            },
         };
 
         return twitterEnvSchema.parse(twitterConfig);

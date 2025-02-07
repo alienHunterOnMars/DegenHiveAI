@@ -64,7 +64,7 @@ export async function buildConversationThread(
             const roomId = stringToUuid(
                 currentTweet.conversationId + "-" + client.runtime.agentId
             );
-            const userId = stringToUuid(currentTweet.userId);
+            const userId = stringToUuid(currentTweet?.userId || "");
 
             await client.runtime.ensureConnection(
                 userId,
@@ -91,22 +91,22 @@ export async function buildConversationThread(
                           )
                         : undefined,
                 },
-                createdAt: currentTweet.timestamp * 1000,
+                createdAt: (currentTweet.timestamp || 0) * 1000,
                 roomId,
                 userId:
-                    currentTweet.userId === client.profile.id
+                    currentTweet.userId === (client.profile?.id || "")
                         ? client.runtime.agentId
-                        : stringToUuid(currentTweet.userId),
+                        : stringToUuid(currentTweet.userId || ""),
                 embedding: getEmbeddingZeroVector(),
             });
         }
 
-        if (visited.has(currentTweet.id)) {
+        if (visited.has(currentTweet.id || "")) {
             Logger.debug("Already visited tweet:", currentTweet.id);
             return;
         }
 
-        visited.add(currentTweet.id);
+        visited.add(currentTweet.id || "");
         thread.unshift(currentTweet);
 
         Logger.debug("Current thread state:", {
@@ -177,14 +177,14 @@ export async function fetchMediaData(
                     throw new Error(`Failed to fetch file: ${attachment.url}`);
                 }
                 const mediaBuffer = Buffer.from(await response.arrayBuffer());
-                const mediaType = attachment.contentType;
+                const mediaType = attachment.contentType ?? 'application/octet-stream';
                 return { data: mediaBuffer, mediaType };
             } else if (fs.existsSync(attachment.url)) {
                 // Handle local file paths
                 const mediaBuffer = await fs.promises.readFile(
                     path.resolve(attachment.url)
                 );
-                const mediaType = attachment.contentType;
+                const mediaType = attachment.contentType ?? 'application/octet-stream';
                 return { data: mediaBuffer, mediaType };
             } else {
                 throw new Error(
@@ -202,10 +202,10 @@ export async function sendTweet(
     twitterUsername: string,
     inReplyTo: string
 ): Promise<Memory[]> {
-    const maxTweetLength = client.twitterConfig.MAX_TWEET_LENGTH;
-    const isLongTweet = maxTweetLength > 280;
+    const maxLength = client.twitterConfig.MAX_TWEET_LENGTH;
+    const isLongTweet = maxLength > 280;
 
-    const tweetChunks = splitTweetContent(content.text, maxTweetLength);
+    const tweetChunks = splitTweetContent(content.text, maxLength);
     const sentTweets: Tweet[] = [];
     let previousTweetId = inReplyTo;
 
@@ -223,19 +223,19 @@ export async function sendTweet(
                 ? client.twitterClient.sendLongTweet(
                       cleanChunk,
                       previousTweetId,
-                      mediaData
+                      mediaData ?? undefined
                   )
                 : client.twitterClient.sendTweet(
                       cleanChunk,
                       previousTweetId,
-                      mediaData
+                      mediaData ?? undefined
                   )
         );
 
         const body = await result.json();
         const tweetResult = isLongTweet
-            ? body?.data?.notetweet_create?.tweet_results?.result
-            : body?.data?.create_tweet?.tweet_results?.result;
+            ? (body as any)?.data?.notetweet_create?.tweet_results?.result
+            : (body as any)?.data?.create_tweet?.tweet_results?.result;
 
         // if we have a response
         if (tweetResult) {
@@ -257,7 +257,7 @@ export async function sendTweet(
                 videos: [],
             };
             sentTweets.push(finalTweet);
-            previousTweetId = finalTweet.id;
+            previousTweetId = finalTweet.id || "";
         } else {
             Logger.error("Error sending tweet chunk:", {
                 chunk,
@@ -274,19 +274,17 @@ export async function sendTweet(
         agentId: client.runtime.agentId,
         userId: client.runtime.agentId,
         content: {
-            tweetId: tweet.id,
-            text: tweet.text,
+            tweetId: tweet.id ?? '',
+            text: tweet.text ?? '',
             source: "twitter",
-            url: tweet.permanentUrl,
+            url: tweet.permanentUrl ?? '',
             inReplyTo: tweet.inReplyToStatusId
-                ? stringToUuid(
-                      tweet.inReplyToStatusId + "-" + client.runtime.agentId
-                  )
+                ? stringToUuid(tweet.inReplyToStatusId + "-" + client.runtime.agentId)
                 : undefined,
         },
         roomId,
         embedding: getEmbeddingZeroVector(),
-        createdAt: tweet.timestamp * 1000, 
+        createdAt: (tweet.timestamp || 0) * 1000, 
     }));
 
     return memories;

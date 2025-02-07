@@ -1,5 +1,5 @@
 import { SearchMode } from "agent-twitter-client";
-import { composeContext } from "@hiveai/core";
+// import { composeContext } from "@hiveai/core";
 import { generateMessageResponse, generateText } from "@hiveai/core";
 import { messageCompletionFooter } from "@hiveai/core";
 import { Logger } from "@hiveai/utils";
@@ -14,7 +14,7 @@ import {
 } from "@hiveai/core";
 import { stringToUuid } from "@hiveai/core";
 import type { ClientBase } from "./base";
-import { buildConversationThread, sendTweet, wait } from "./utils.ts";
+import { buildConversationThread, sendTweet, wait } from "./utils";
 
 const twitterSearchTemplate =
     `{{timeline}}
@@ -45,11 +45,11 @@ Your response should not contain any questions. Brief, concise statements only. 
 
 export class TwitterSearchClient {
     client: ClientBase;
-    runtime: IAgentRuntime;
+    runtime: any;
     twitterUsername: string;
     private respondedTweets: Set<string> = new Set();
 
-    constructor(client: ClientBase, runtime: IAgentRuntime) {
+    constructor(client: ClientBase, runtime: any) {
         this.client = client;
         this.runtime = runtime;
         this.twitterUsername = this.client.twitterConfig.TWITTER_USERNAME;
@@ -74,8 +74,8 @@ export class TwitterSearchClient {
     private async engageWithSearchTerms() {
         Logger.log("Engaging with search terms");
         try {
-            const searchTerm = [...this.runtime.character.topics][
-                Math.floor(Math.random() * this.runtime.character.topics.length)
+            const searchTerm = [...(this.runtime as any).character.topics][
+                Math.floor(Math.random() * (this.runtime as any).character.topics.length)
             ];
 
             Logger.log("Fetching search tweets");
@@ -151,8 +151,8 @@ export class TwitterSearchClient {
             const tweetId = mostInterestingTweetResponse.trim();
             const selectedTweet = slicedTweets.find(
                 (tweet) =>
-                    tweet.id.toString().includes(tweetId) ||
-                    tweetId.includes(tweet.id.toString())
+                    tweet.id?.toString().includes(tweetId) ||
+                    tweetId.includes(tweet.id?.toString() || "")
             );
 
             if (!selectedTweet) {
@@ -203,7 +203,7 @@ export class TwitterSearchClient {
                 userId: userIdUUID,
                 roomId,
                 // Timestamps are in seconds, but we need them in milliseconds
-                createdAt: selectedTweet.timestamp * 1000,
+                createdAt: (selectedTweet.timestamp || 0) * 1000,
             };
 
             if (!message.content.text) {
@@ -221,20 +221,20 @@ export class TwitterSearchClient {
             let tweetBackground = "";
             if (selectedTweet.isRetweet) {
                 const originalTweet = await this.client.requestQueue.add(() =>
-                    this.client.twitterClient.getTweet(selectedTweet.id)
+                    (this.client as any).twitterClient.getTweet(selectedTweet.id || "") 
                 );
-                tweetBackground = `Retweeting @${originalTweet.username}: ${originalTweet.text}`;
+                tweetBackground = `Retweeting @${(originalTweet as any).username}: ${(originalTweet as any).text}`;
             }
 
             // Generate image descriptions using GPT-4 vision API
             const imageDescriptions = [];
             for (const photo of selectedTweet.photos) {
                 const description = await this.runtime
-                    .getService<IImageDescriptionService>(
+                    .getService(
                         ServiceType.IMAGE_DESCRIPTION
-                    )
-                    .describeImage(photo.url);
-                imageDescriptions.push(description);
+                    ) as IImageDescriptionService;
+                const imageDescription = await description.describeImage(photo.url);
+                imageDescriptions.push(imageDescription);
             }
 
             let state = await this.runtime.composeState(message, {
@@ -251,14 +251,15 @@ export class TwitterSearchClient {
   `,
             });
 
-            await this.client.saveRequestMessage(message, state as State);
+            await (this.client as any).saveRequestMessage(message, state as State);
 
-            const context = composeContext({
-                state,
-                template:
-                    this.runtime.character.templates?.twitterSearchTemplate ||
-                    twitterSearchTemplate,
-            });
+            // const context = composeContext({
+            //     state,
+            //     template:
+            //         this.runtime.character.templates?.twitterSearchTemplate ||
+            //         twitterSearchTemplate,
+            // });
+            let context = "";
 
             const responseContent = await generateMessageResponse({
                 runtime: this.runtime,
@@ -285,7 +286,7 @@ export class TwitterSearchClient {
                         response,
                         message.roomId,
                         this.twitterUsername,
-                        selectedTweet.id
+                        selectedTweet.id || ""
                     );
                     return memories;
                 };
@@ -312,7 +313,7 @@ export class TwitterSearchClient {
                     callback
                 );
 
-                this.respondedTweets.add(selectedTweet.id);
+                this.respondedTweets.add(selectedTweet.id || "");
                 const responseInfo = `Context:\n\n${context}\n\nSelected Post: ${selectedTweet.id} - ${selectedTweet.username}: ${selectedTweet.text}\nAgent's Output:\n${response.text}`;
 
                 await this.runtime.cacheManager.set(

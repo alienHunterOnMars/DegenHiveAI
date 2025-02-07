@@ -1,9 +1,8 @@
 import type { Tweet } from "agent-twitter-client";
 import {
-    composeContext,
+    // composeContext,
     generateText,
     getEmbeddingZeroVector,
-    type IAgentRuntime,
     ModelClass,
     stringToUuid,
     type TemplateType,
@@ -18,9 +17,9 @@ import type { ClientBase } from "./base.ts";
 import { postActionResponseFooter } from "@hiveai/core";
 import { generateTweetActions } from "@hiveai/core";
 import { type IImageDescriptionService, ServiceType } from "@hiveai/core";
-import { buildConversationThread, fetchMediaData } from "./utils.ts";
-import { twitterMessageHandlerTemplate } from "./interactions.ts";
-import { DEFAULT_MAX_TWEET_LENGTH } from "./environment.ts";
+import { buildConversationThread, fetchMediaData } from "./utils";
+import { twitterMessageHandlerTemplate } from "./interactions";
+import { DEFAULT_MAX_TWEET_LENGTH } from "./environment";
 import {
     Client,
     Events,
@@ -30,7 +29,7 @@ import {
 } from "discord.js";
 import type { State } from "@hiveai/core";
 import type { ActionResponse } from "@hiveai/core";
-import { MediaData } from "./types.ts";
+import { MediaData } from "./types";
 
 const MAX_TIMELINES_TO_FETCH = 15;
 
@@ -95,18 +94,18 @@ type PendingTweetApprovalStatus = "PENDING" | "APPROVED" | "REJECTED";
 
 export class TwitterPostClient {
     client: ClientBase;
-    runtime: IAgentRuntime;
+    runtime: any;
     twitterUsername: string;
     private isProcessing = false;
     private lastProcessTime = 0;
     private stopProcessingActions = false;
     private isDryRun: boolean;
-    private discordClientForApproval: Client;
+    private discordClientForApproval: Client | undefined;
     private approvalRequired = false;
-    private discordApprovalChannelId: string;
-    private approvalCheckInterval: number;
+    private discordApprovalChannelId: string | undefined;
+    private approvalCheckInterval: number | undefined;
 
-    constructor(client: ClientBase, runtime: IAgentRuntime) {
+    constructor(client: ClientBase, runtime: any) {
         this.client = client;
         this.runtime = runtime;
         this.twitterUsername = this.client.twitterConfig.TWITTER_USERNAME;
@@ -172,8 +171,9 @@ export class TwitterPostClient {
 
             const APPROVAL_CHECK_INTERVAL =
                 Number.parseInt(
-                    this.runtime.getSetting("TWITTER_APPROVAL_CHECK_INTERVAL")
-                ) || 5 * 60 * 1000; // 5 minutes
+                    this.runtime.getSetting("TWITTER_APPROVAL_CHECK_INTERVAL") ||
+                        "5"
+                ) * 60 * 1000; // 5 minutes
 
             this.approvalCheckInterval = APPROVAL_CHECK_INTERVAL;
 
@@ -232,9 +232,9 @@ export class TwitterPostClient {
         }
 
         const generateNewTweetLoop = async () => {
-            const lastPost = await this.runtime.cacheManager.get<{
-                timestamp: number;
-            }>("twitter/" + this.twitterUsername + "/lastPost");
+            const lastPost = await (this.runtime as any).cacheManager.get(
+                "twitter/" + this.twitterUsername + "/lastPost"
+            ) as { timestamp: number } | null;
 
             const lastPostTimestamp = lastPost?.timestamp ?? 0;
             const minMinutes = this.client.twitterConfig.POST_INTERVAL_MIN;
@@ -335,7 +335,7 @@ export class TwitterPostClient {
     }
 
     async processAndCacheTweet(
-        runtime: IAgentRuntime,
+        runtime: any,
         client: ClientBase,
         tweet: Tweet,
         roomId: UUID,
@@ -343,7 +343,7 @@ export class TwitterPostClient {
     ) {
         // Cache the last post details
         await runtime.cacheManager.set(
-            `twitter/${client.profile.username}/lastPost`,
+            `twitter/${client.profile?.username || ""}/lastPost`,
             {
                 id: tweet.id,
                 timestamp: Date.now(),
@@ -427,7 +427,7 @@ export class TwitterPostClient {
                         mediaData
                     )
             );
-            const body = await standardTweetResult.json();
+            const body : any = await standardTweetResult.json();
             if (!body?.data?.create_tweet?.tweet_results?.result) {
                 Logger.error("Error sending tweet; Bad response:", body);
                 return;
@@ -440,7 +440,7 @@ export class TwitterPostClient {
     }
 
     async postTweet(
-        runtime: IAgentRuntime,
+        runtime: any,
         client: ClientBase,
         tweetTextForPosting: string,
         roomId: UUID,
@@ -495,11 +495,11 @@ export class TwitterPostClient {
 
         try {
             const roomId = stringToUuid(
-                "twitter_generate_room-" + this.client.profile.username
+                "twitter_generate_room-" + this.client.profile?.username || ""
             );
             await this.runtime.ensureUserExists(
                 this.runtime.agentId,
-                this.client.profile.username,
+                this.client.profile?.username || "",
                 this.runtime.character.name,
                 "twitter"
             );
@@ -517,17 +517,18 @@ export class TwitterPostClient {
                     },
                 },
                 {
-                    twitterUserName: this.client.profile.username,
+                    twitterUserName: this.client.profile?.username || "",
                     maxTweetLength,
                 }
             );
 
-            const context = composeContext({
-                state,
-                template:
-                    this.runtime.character.templates?.twitterPostTemplate ||
-                    twitterPostTemplate,
-            });
+            // const context = composeContext({
+            //     state,
+            //     template:
+            //         this.runtime.character.templates?.twitterPostTemplate ||
+            //         twitterPostTemplate,
+            // });
+            const context = "";
 
             Logger.debug("generate post prompt:\n" + context);
 
@@ -563,7 +564,7 @@ export class TwitterPostClient {
                 ]).text;
                 if (parsingText) {
                     tweetTextForPosting = truncateToCompleteSentence(
-                        extractAttributes(rawTweetContent, ["text"]).text,
+                        extractAttributes(rawTweetContent, ["text"]).text || "",
                         this.client.twitterConfig.MAX_TWEET_LENGTH
                     );
                 }
@@ -622,7 +623,7 @@ export class TwitterPostClient {
                         roomId,
                         rawTweetContent,
                         this.twitterUsername,
-                        mediaData
+                        mediaData || []
                     );
                 }
             } catch (error) {
@@ -640,13 +641,14 @@ export class TwitterPostClient {
             context?: string;
         }
     ): Promise<string> {
-        const context = composeContext({
-            state: tweetState,
-            template:
-                options?.template ||
-                this.runtime.character.templates?.twitterPostTemplate ||
-                twitterPostTemplate,
-        });
+        // const context = composeContext({
+        //     state: tweetState,
+        //     template:
+        //         options?.template ||
+        //         this.runtime.character.templates?.twitterPostTemplate ||
+        //         twitterPostTemplate,
+        // });
+        const context = "";
 
         const response = await generateText({
             runtime: this.runtime,
@@ -660,8 +662,8 @@ export class TwitterPostClient {
         const cleanedResponse = cleanJsonResponse(response);
 
         // Try to parse as JSON first
-        const jsonResponse = parseJSONObjectFromText(cleanedResponse);
-        if (jsonResponse.text) {
+        const jsonResponse : any = parseJSONObjectFromText(cleanedResponse);
+        if (jsonResponse?.text) {
             const truncateContent = truncateToCompleteSentence(
                 jsonResponse.text,
                 this.client.twitterConfig.MAX_TWEET_LENGTH
@@ -731,7 +733,7 @@ export class TwitterPostClient {
             );
             const maxActionsProcessing =
                 this.client.twitterConfig.MAX_ACTIONS_PROCESSING;
-            const processedTimelines = [];
+            const processedTimelines : any[] = [];
 
             for (const tweet of timelines) {
                 try {
@@ -764,13 +766,14 @@ export class TwitterPostClient {
                         }
                     );
 
-                    const actionContext = composeContext({
-                        state: tweetState,
-                        template:
-                            this.runtime.character.templates
-                                ?.twitterActionTemplate ||
-                            twitterActionTemplate,
-                    });
+                    // const actionContext = composeContext({
+                    //     state: tweetState,
+                    //     template:
+                    //         this.runtime.character.templates
+                    //             ?.twitterActionTemplate ||
+                    //         twitterActionTemplate,
+                    // });
+                    const actionContext = "";
 
                     const actionResponse = await generateTweetActions({
                         runtime: this.runtime,
@@ -873,7 +876,7 @@ export class TwitterPostClient {
                         executedActions.push("like (dry run)");
                     } else {
                         try {
-                            await this.client.twitterClient.likeTweet(tweet.id);
+                            await this.client.twitterClient.likeTweet(tweet.id || "");
                             executedActions.push("like");
                             Logger.log(`Liked tweet ${tweet.id}`);
                         } catch (error) {
@@ -893,7 +896,7 @@ export class TwitterPostClient {
                         executedActions.push("retweet (dry run)");
                     } else {
                         try {
-                            await this.client.twitterClient.retweet(tweet.id);
+                            await this.client.twitterClient.retweet(tweet.id || "");
                             executedActions.push("retweet");
                             Logger.log(`Retweeted tweet ${tweet.id}`);
                         } catch (error) {
@@ -914,7 +917,7 @@ export class TwitterPostClient {
                         );
                         const formattedConversation = thread
                             .map(
-                                (t) =>
+                                (t: any) =>
                                     `@${t.username} (${new Date(
                                         t.timestamp * 1000
                                     ).toLocaleString()}): ${t.text}`
@@ -929,10 +932,9 @@ export class TwitterPostClient {
                             );
                             for (const photo of tweet.photos) {
                                 const description = await this.runtime
-                                    .getService<IImageDescriptionService>(
+                                    .getService(
                                         ServiceType.IMAGE_DESCRIPTION
-                                    )
-                                    .describeImage(photo.url);
+                                    ) as IImageDescriptionService;
                                 imageDescriptions.push(description);
                             }
                         }
@@ -1002,7 +1004,7 @@ export class TwitterPostClient {
                             Logger.error(
                                 "Failed to generate valid quote tweet content"
                             );
-                            return;
+                            return [];
                         }
 
                         Logger.log(
@@ -1019,9 +1021,9 @@ export class TwitterPostClient {
                             // Send the tweet through request queue
                             const result = await this.client.requestQueue.add(
                                 async () =>
-                                    await this.client.twitterClient.sendQuoteTweet(
+                                    await (this.client as any).twitterClient.sendQuoteTweet(
                                         quoteContent,
-                                        tweet.id
+                                        tweet.id || ""
                                     )
                             );
 
@@ -1073,7 +1075,7 @@ export class TwitterPostClient {
                 // Add these checks before creating memory
                 await this.runtime.ensureRoomExists(roomId);
                 await this.runtime.ensureUserExists(
-                    stringToUuid(tweet.userId),
+                    stringToUuid(tweet.userId || ""),
                     tweet.username,
                     tweet.name,
                     "twitter"
@@ -1087,7 +1089,7 @@ export class TwitterPostClient {
                     // Then create the memory
                     await this.runtime.messageManager.createMemory({
                         id: stringToUuid(tweet.id + "-" + this.runtime.agentId),
-                        userId: stringToUuid(tweet.userId),
+                        userId: stringToUuid(tweet.userId || ""),
                         content: {
                             text: tweet.text,
                             url: tweet.permanentUrl,
@@ -1097,7 +1099,7 @@ export class TwitterPostClient {
                         agentId: this.runtime.agentId,
                         roomId,
                         embedding: getEmbeddingZeroVector(),
-                        createdAt: tweet.timestamp * 1000,
+                        createdAt: tweet.timestamp ? tweet.timestamp * 1000 : 0,
                     });
                 }
 
@@ -1112,7 +1114,11 @@ export class TwitterPostClient {
             }
         }
 
-        return results;
+        return results as {
+            tweetId: string;
+            actionResponse: ActionResponse;
+            executedActions: string[];
+        }[];
     }
 
     /**
@@ -1129,7 +1135,7 @@ export class TwitterPostClient {
             const thread = await buildConversationThread(tweet, this.client);
             const formattedConversation = thread
                 .map(
-                    (t) =>
+                    (t: any) =>
                         `@${t.username} (${new Date(
                             t.timestamp * 1000
                         ).toLocaleString()}): ${t.text}`
@@ -1142,10 +1148,9 @@ export class TwitterPostClient {
                 Logger.log("Processing images in tweet for context");
                 for (const photo of tweet.photos) {
                     const description = await this.runtime
-                        .getService<IImageDescriptionService>(
+                        .getService(
                             ServiceType.IMAGE_DESCRIPTION
-                        )
-                        .describeImage(photo.url);
+                        ) as IImageDescriptionService;
                     imageDescriptions.push(description);
                 }
             }
@@ -1262,7 +1267,7 @@ export class TwitterPostClient {
                 fields: [
                     {
                         name: "Character",
-                        value: this.client.profile.username,
+                        value: this.client.profile?.username || "",
                         inline: true,
                     },
                     {
@@ -1277,8 +1282,8 @@ export class TwitterPostClient {
                 timestamp: new Date().toISOString(),
             };
 
-            const channel = await this.discordClientForApproval.channels.fetch(
-                this.discordApprovalChannelId
+            const channel = await (this.discordClientForApproval as any).channels.fetch(
+                this.discordApprovalChannelId || ""
             );
 
             if (!channel || !(channel instanceof TextChannel)) {
@@ -1288,23 +1293,23 @@ export class TwitterPostClient {
             const message = await channel.send({ embeds: [embed] });
 
             // Store the pending tweet
-            const pendingTweetsKey = `twitter/${this.client.profile.username}/pendingTweet`;
+            const pendingTweetsKey = `twitter/${this.client.profile?.username || ""}/pendingTweet`;
             const currentPendingTweets =
-                (await this.runtime.cacheManager.get<PendingTweet[]>(
+                (await (this.runtime as any).cacheManager.get(
                     pendingTweetsKey
-                )) || [];
+                ) as PendingTweet[] | null) || [];
             // Add new pending tweet
             currentPendingTweets.push({
                 tweetTextForPosting,
                 roomId,
                 rawTweetContent,
                 discordMessageId: message.id,
-                channelId: this.discordApprovalChannelId,
+                channelId: this.discordApprovalChannelId || "",
                 timestamp: Date.now(),
             });
 
             // Store updated array
-            await this.runtime.cacheManager.set(
+            await (this.runtime as any).cacheManager.set(
                 pendingTweetsKey,
                 currentPendingTweets
             );
@@ -1324,8 +1329,8 @@ export class TwitterPostClient {
     ): Promise<PendingTweetApprovalStatus> {
         try {
             // Fetch message and its replies from Discord
-            const channel = await this.discordClientForApproval.channels.fetch(
-                this.discordApprovalChannelId
+            const channel = await (this.discordClientForApproval as any).channels.fetch(
+                this.discordApprovalChannelId || ""
             );
 
             Logger.log(`channel ${JSON.stringify(channel)}`);
@@ -1374,15 +1379,15 @@ export class TwitterPostClient {
     }
 
     private async cleanupPendingTweet(discordMessageId: string) {
-        const pendingTweetsKey = `twitter/${this.client.profile.username}/pendingTweet`;
+        const pendingTweetsKey = `twitter/${this.client.profile?.username || ""}/pendingTweet`;
         const currentPendingTweets =
-            (await this.runtime.cacheManager.get<PendingTweet[]>(
+            (await (this.runtime as any).cacheManager.get(
                 pendingTweetsKey
-            )) || [];
+            ) as PendingTweet[] | null) || [];
 
         // Remove the specific tweet
         const updatedPendingTweets = currentPendingTweets.filter(
-            (tweet) => tweet.discordMessageId !== discordMessageId
+            (tweet: any) => tweet.discordMessageId !== discordMessageId
         );
 
         if (updatedPendingTweets.length === 0) {
@@ -1397,11 +1402,11 @@ export class TwitterPostClient {
 
     private async handlePendingTweet() {
         Logger.log("Checking Pending Tweets...");
-        const pendingTweetsKey = `twitter/${this.client.profile.username}/pendingTweet`;
+        const pendingTweetsKey = `twitter/${this.client.profile?.username || ""}/pendingTweet`;
         const pendingTweets =
-            (await this.runtime.cacheManager.get<PendingTweet[]>(
+            (await (this.runtime as any).cacheManager.get(
                 pendingTweetsKey
-            )) || [];
+            ) as PendingTweet[] | null) || [];
 
         for (const pendingTweet of pendingTweets) {
             // Check if tweet is older than 24 hours
@@ -1414,7 +1419,7 @@ export class TwitterPostClient {
                 // Notify on Discord about expiration
                 try {
                     const channel =
-                        await this.discordClientForApproval.channels.fetch(
+                        await (this.discordClientForApproval as any).channels.fetch(
                             pendingTweet.channelId
                         );
                     if (channel instanceof TextChannel) {
@@ -1455,7 +1460,7 @@ export class TwitterPostClient {
                 // Notify on Discord about posting
                 try {
                     const channel =
-                        await this.discordClientForApproval.channels.fetch(
+                        await (this.discordClientForApproval as any).channels.fetch(
                             pendingTweet.channelId
                         );
                     if (channel instanceof TextChannel) {
@@ -1480,7 +1485,7 @@ export class TwitterPostClient {
                 // Notify about Rejection of Tweet
                 try {
                     const channel =
-                        await this.discordClientForApproval.channels.fetch(
+                        await (this.discordClientForApproval as any).channels.fetch(
                             pendingTweet.channelId
                         );
                     if (channel instanceof TextChannel) {
