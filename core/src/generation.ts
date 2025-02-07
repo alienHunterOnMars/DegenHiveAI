@@ -2388,11 +2388,12 @@ async function handleDeepSeek({
     schemaDescription,
     mode = "json",
     modelOptions,
-}: ProviderOptions): Promise<GenerateObjectResult<unknown>> {
+}: ProviderOptions): Promise<any> {
     const openai = createOpenAI({ apiKey, baseURL: models.deepseek.endpoint });
-
+    
+    // @ts-ignore - Bypass deep type instantiation error
     return await aiGenerateObject({
-        model: openai.languageModel(model),
+        model: (openai.languageModel(model) as any),
         schema,
         schemaName,
         schemaDescription,
