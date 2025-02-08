@@ -1,6 +1,9 @@
 export interface RedditConfig {
+    userAgent: string;
     clientId: string;
     clientSecret: string;
+    username: string;
+    password: string;
     refreshToken: string;
     monitoredSubreddits: string[];
     autoReplyEnabled: boolean;

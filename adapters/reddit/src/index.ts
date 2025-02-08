@@ -8,6 +8,15 @@ import { RedditPostHandler } from './handlers/postHandler';
 import { RedditConfig, RedditPost } from './types';
 
 export class RedditAdapter extends EventEmitter {
+    private static readonly POLLING_INTERVAL = 60000; // 1 minute
+    private static readonly REQUEST_DELAY = 2000; // 2 seconds between requests
+    private static readonly MAX_ITEMS_PER_REQUEST = 20;
+    private lastPollTimestamps = {
+        messages: 0,
+        mentions: 0,
+        subreddits: 0
+    };
+
     private client: Snoowrap;
     private messageHandler: RedditMessageHandler;
     private postHandler: RedditPostHandler;
@@ -19,28 +28,28 @@ export class RedditAdapter extends EventEmitter {
         super();
         this.config = config;
 
-        // Initialize Reddit client
+        // Initialize Reddit client with conservative rate limits
         this.client = new Snoowrap({
-            userAgent: 'DragonbeeBot/1.0.0',
+            userAgent: config.userAgent,
             clientId: config.clientId,
             clientSecret: config.clientSecret,
-            username: 'put your username here',
-            password: 'put your password here'
+            username: config.username,
+            password: config.password
         });
 
         // Initialize handlers
         this.messageHandler = new RedditMessageHandler(this.client);
         this.postHandler = new RedditPostHandler(this.client);
 
-        // Configure client
+        // Configure client with conservative rate limits
         this.client.config({
-            requestDelay: 1000, // Respect rate limits
+            requestDelay: 2000, // 2 seconds between requests
+            maxRetryAttempts: 3,
             continueAfterRatelimitError: true,
-            retryErrorCodes: [502, 503, 504, 522]
+            retryErrorCodes: [502, 503, 504, 522],
+            debug: process.env.NODE_ENV === 'development'
         });
     }
-
- 
 
     private async handleCrossClientMessage(message: CrossClientMessage): Promise<void> {
         if (!this.messageBroker) return;
@@ -103,18 +112,10 @@ export class RedditAdapter extends EventEmitter {
     }
 
     private startPolling(): void {
-        this.pollInterval = setInterval(async () => {
-            try {
-                const tasks = [
-                    this.checkNewMessages(),
-                    this.checkMentions(),
-                    this.checkSubredditActivity()
-                ];
-                await Promise.all(tasks);
-            } catch (error) {
-                Logger.error('Error in Reddit polling:', error);
-            }
-        }, 30000); // Poll every 30 seconds
+        // Instead of running all tasks together, stagger them
+        setInterval(() => this.checkNewMessages(), RedditAdapter.POLLING_INTERVAL);
+        setInterval(() => this.checkMentions(), RedditAdapter.POLLING_INTERVAL + 20000); // Offset by 20 seconds
+        setInterval(() => this.checkSubredditActivity(), RedditAdapter.POLLING_INTERVAL + 40000); // Offset by 40 seconds
     }
 
     async submitPost(
@@ -143,45 +144,108 @@ export class RedditAdapter extends EventEmitter {
     }
 
     private async checkNewMessages(): Promise<void> {
+        if (Date.now() - this.lastPollTimestamps.messages < RedditAdapter.POLLING_INTERVAL) {
+            return; // Prevent overlapping polls
+        }
+
         try {
-            const messages = await (async () => this.client.getUnreadMessages())();
+            this.lastPollTimestamps.messages = Date.now();
+            const messages = await this.client.getUnreadMessages({ limit: RedditAdapter.MAX_ITEMS_PER_REQUEST });
+            
+            // Process messages sequentially with delay
             for (const message of messages) {
                 await this.messageHandler.handleMessage(message);
+                await this.sleep(RedditAdapter.REQUEST_DELAY);
             }
-            await this.client.markMessagesAsRead(messages);
+
+            if (messages.length > 0) {
+                await this.sleep(RedditAdapter.REQUEST_DELAY);
+                await this.client.markMessagesAsRead(messages);
+            }
+
         } catch (error) {
-            Logger.error('Error checking messages:', error);
+            if (this.isRateLimitError(error)) {
+                Logger.warn('Rate limit reached in checkNewMessages, waiting before retry');
+                await this.sleep(60000); // Wait a minute before retrying
+            } else {
+                Logger.error('Error checking messages:', error);
+            }
         }
     }
 
     private async checkMentions(): Promise<void> {
+        if (Date.now() - this.lastPollTimestamps.mentions < RedditAdapter.POLLING_INTERVAL) {
+            return;
+        }
+
         try {
-            const messages = await (async () => this.client.getUnreadMessages())() as (Comment | PrivateMessage)[];
+            this.lastPollTimestamps.mentions = Date.now();
+            const messages = await this.client.getUnreadMessages({ limit: RedditAdapter.MAX_ITEMS_PER_REQUEST });
+            
             const mentions = messages.filter(
-                (message): message is Comment => 'body' in message && 'author' in message && 'parent_id' in message
+                (message): message is any => 
+                    'body' in message && 
+                    'author' in message && 
+                    'parent_id' in message
             );
+
+            // Process mentions sequentially with delay
             for (const mention of mentions) {
-                await this.messageHandler.handleMention(mention);
+                await this.messageHandler.handleMention(mention as any);
+                await this.sleep(RedditAdapter.REQUEST_DELAY);
             }
+
         } catch (error) {
-            Logger.error('Error checking mentions:', error);
+            if (this.isRateLimitError(error)) {
+                Logger.warn('Rate limit reached in checkMentions, waiting before retry');
+                await this.sleep(60000);
+            } else {
+                Logger.error('Error checking mentions:', error);
+            }
         }
     }
 
     private async checkSubredditActivity(): Promise<void> {
+        if (Date.now() - this.lastPollTimestamps.subreddits < RedditAdapter.POLLING_INTERVAL) {
+            return;
+        }
+
         try {
+            this.lastPollTimestamps.subreddits = Date.now();
+            
+            // Process each subreddit sequentially
             for (const subreddit of this.config.monitoredSubreddits) {
+                await this.sleep(RedditAdapter.REQUEST_DELAY);
+                
                 const newPosts = await this.client
                     .getSubreddit(subreddit)
-                    .getNew({ limit: 25 });
+                    .getNew({ limit: RedditAdapter.MAX_ITEMS_PER_REQUEST });
                 
+                // Process posts sequentially with delay
                 for (const post of newPosts) {
                     await this.postHandler.handleNewPost(post);
+                    await this.sleep(RedditAdapter.REQUEST_DELAY);
                 }
             }
+
         } catch (error) {
-            Logger.error('Error checking subreddit activity:', error);
+            if (this.isRateLimitError(error)) {
+                Logger.warn('Rate limit reached in checkSubredditActivity, waiting before retry');
+                await this.sleep(60000);
+            } else {
+                Logger.error('Error checking subreddit activity:', error);
+            }
         }
+    }
+
+    private isRateLimitError(error: any): boolean {
+        return error?.message?.includes('RATELIMIT') || 
+               error?.statusCode === 429 ||
+               error?.error === 'TOO_MANY_REQUESTS';
+    }
+
+    private sleep(ms: number): Promise<void> {
+        return new Promise(resolve => setTimeout(resolve, ms));
     }
 
     async stop(): Promise<void> {
@@ -189,8 +253,7 @@ export class RedditAdapter extends EventEmitter {
             await this.messageBroker.disconnect();
         }
         clearInterval(this.pollInterval);
+        this.lastPollTimestamps = { messages: 0, mentions: 0, subreddits: 0 };
         Logger.info('Reddit adapter stopped');
     }
-
- 
 } 

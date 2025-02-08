@@ -121,21 +121,19 @@ class HiveSwarm {
             Logger.info('Starting HiveAI Swarm...');
 
             // // Initialize Discord adapter
-            const discordAdapter = new DiscordAdapter(this.config.discord);
-            discordAdapter.start();
-            this.adapters.set('discord', discordAdapter);
+            // const discordAdapter = new DiscordAdapter(this.config.discord);
+            // discordAdapter.start();
+            // this.adapters.set('discord', discordAdapter);
 
             // Get all server information
-            const servers = await discordAdapter.getServers();
-            console.log('All servers:', servers);
-
-   
+            // const servers = await discordAdapter.getServers();
+            // console.log('All servers:', servers);
 
             // Initialize Telegram adapter
             // const telegramAdapter = new TelegramAdapter(this.config.telegram);
             // this.adapters.set('telegram', telegramAdapter);
 
-            // // Initialize Reddit adapter
+            // Initialize Reddit adapter
             // const redditAdapter = new RedditAdapter(this.config.reddit);
             // this.adapters.set('reddit', redditAdapter);
 
@@ -144,8 +142,8 @@ class HiveSwarm {
             // this.adapters.set('twitter', twitterAdapter);
 
             // // Initialize Farcaster adapter
-            // const farcasterAdapter = new FarcasterAdapter(this.config.farcaster);
-            // this.adapters.set('farcaster', farcasterAdapter);
+            const farcasterAdapter = new FarcasterAdapter(this.config.farcaster);
+            this.adapters.set('farcaster', farcasterAdapter);
 
             // // Initialize Email adapter
             // const emailAdapter = new EmailAdapter(this.config.email);
