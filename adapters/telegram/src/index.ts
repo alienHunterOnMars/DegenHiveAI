@@ -29,14 +29,9 @@ export class TelegramAdapter extends EventEmitter {
 
     constructor(config: TelegramConfig) {
         super();
+
         this.config = config;
-
-        Logger.info(" adapters/telegram/src/index.ts");
-        Logger.info(this.config);
-
-
         this.client = new TelegramClient(config);
-
 
         if (config.messageBroker) {
             this.messageBroker = new MessageBroker({
@@ -139,41 +134,4 @@ export class TelegramAdapter extends EventEmitter {
     }
 }
 
-async function boot() {
-  try {
-    Logger.info("Bootstrapping DegenHive AI Hive Swarm Telegram Client...");
-
-    // Initialize managers
-    const userManager = new UserManager();
-    const tradeManager = new TradeManager();
-    const rlManager = new RLManager();
-    const memoryManager = new MemoryManager();
-
-    // Initialize and start Telegram client (injecting dependencies into its MessageManager)
-    const telegramBotToken = process.env.TELEGRAM_BOT_TOKEN || "";
-    if (!telegramBotToken) {
-      throw new Error("TELEGRAM_BOT_TOKEN is missing");
-    }
-
-    const telegramClient = new TelegramClient({
-      token: telegramBotToken,
-      founderChatId: process.env.TELEGRAM_FOUNDER_CHAT_ID || "",
-      groupChatId: process.env.TELEGRAM_GROUP_CHAT_ID || ""
-    });
-
-    // Start the Telegram client
-    await telegramClient.start();
-    
-    // Optionally, start a periodic sync from global RL to all local models
-    setInterval(() => {
-      rlManager.syncLocalModels();
-    }, 60 * 60 * 1000); // e.g., every hour
-
-    Logger.success("DegenHive AI Hive Swarm Telegram Client started successfully!");
-  } catch (error) {
-    Logger.error("Boot error:", error);
-    process.exit(1);
-  }
-}
-
-boot();
+ 

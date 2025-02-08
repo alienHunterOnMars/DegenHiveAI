@@ -1,28 +1,33 @@
 export class Logger {
+  private static supportsColor(): boolean {
+    // Check if we're in a Node.js environment and if it supports colors
+    return process.stdout.isTTY && process.env.FORCE_COLOR !== '0';
+  }
+
+  private static getPrefix(level: string, color: string): string {
+    return Logger.supportsColor() 
+      ? `\x1b[${color}m[${level}]\x1b[0m`
+      : `[${level}]`;
+  }
 
   static success(...args: any[]): void {
-    // \x1b[32m: green; \x1b[0m: reset
-    console.log("\x1b[32m[SUCCESS]\x1b[0m", ...args);
+    console.log(Logger.getPrefix('SUCCESS', '32'), ...args);
   }
 
   static info(...args: any[]): void {
-    // \x1b[32m: green; \x1b[0m: reset
-    console.log("\x1b[32m[INFO]\x1b[0m", ...args);
+    console.log(Logger.getPrefix('INFO', '32'), ...args);
   }
 
   static warn(...args: any[]): void {
-    // \x1b[33m: yellow; \x1b[0m: reset
-    console.warn("\x1b[33m[WARN]\x1b[0m", ...args);
+    console.warn(Logger.getPrefix('WARN', '33'), ...args);
   }
 
   static error(...args: any[]): void {
-    // \x1b[31m: red; \x1b[0m: reset
-    console.error("\x1b[31m[ERROR]\x1b[0m", ...args);
+    console.error(Logger.getPrefix('ERROR', '31'), ...args);
   }
 
   static debug(...args: any[]): void {
-    // \x1b[34m: blue; \x1b[0m: reset
-    console.debug("\x1b[34m[DEBUG]\x1b[0m", ...args);
+    console.debug(Logger.getPrefix('DEBUG', '34'), ...args);
   }
 
   static log(...args: any[]): void {

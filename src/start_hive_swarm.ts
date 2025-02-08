@@ -20,7 +20,11 @@ import { RedditAdapter } from '@hiveai/adapters-reddit';
 import { TwitterAdapter } from '@hiveai/adapters-twitter';
 import { FarcasterAdapter } from '@hiveai/adapters-farcaster';
 import { EmailAdapter } from '@hiveai/adapters-email';
- 
+
+// Add this at the very top of the file, after imports
+console.log('Raw console.log test');
+Logger.info('Logger test');
+
 // ----------------------------------------------------------------------------
 // Plugin Interfaces and Manager
 // ----------------------------------------------------------------------------
@@ -108,7 +112,7 @@ class HiveSwarm {
 
     constructor() {
         // Load configuration
-        const configPath = process.env.CONFIG_PATH || './configenv.json';
+        const configPath = process.env.CONFIG_PATH || './env.json';
         this.config = JSON.parse(readFileSync(configPath, 'utf-8'));
     }
 
@@ -117,13 +121,19 @@ class HiveSwarm {
             Logger.info('Starting HiveAI Swarm...');
 
             // // Initialize Discord adapter
-            // const discordAdapter = new DiscordAdapter(this.config.discord);
-            // this.adapters.set('discord', discordAdapter);
+            const discordAdapter = new DiscordAdapter(this.config.discord);
+            discordAdapter.start();
+            this.adapters.set('discord', discordAdapter);
+
+            // Get all server information
+            const servers = await discordAdapter.getServers();
+            console.log('All servers:', servers);
+
+   
 
             // Initialize Telegram adapter
-            console.log(this.config.telegram);
-            const telegramAdapter = new TelegramAdapter(this.config.telegram);
-            this.adapters.set('telegram', telegramAdapter);
+            // const telegramAdapter = new TelegramAdapter(this.config.telegram);
+            // this.adapters.set('telegram', telegramAdapter);
 
             // // Initialize Reddit adapter
             // const redditAdapter = new RedditAdapter(this.config.reddit);

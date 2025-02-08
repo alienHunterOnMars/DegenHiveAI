@@ -3,8 +3,7 @@ export interface DiscordConfig {
     guildId: string;
     announcementChannelId: string;
     alphaChannelId: string;
-    communityChannelId: string;
-    moderatorRoleId: string;
+    memeChannelId: string;
     messageBroker?: {
         url: string;
         exchange: string;

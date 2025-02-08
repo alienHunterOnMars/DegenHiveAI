@@ -26,9 +26,8 @@ export class TelegramClient {
     private memoryManager: MemoryManager;
 
     constructor(config: TelegramClientOptions) {
-        Logger.info("TelegramClient constructor");
-        Logger.info(config);
-        this.bot = new Telegraf(config.token);
+
+      this.bot = new Telegraf(config.token);
         
         // Initialize managers
         this.userManager = new UserManager();

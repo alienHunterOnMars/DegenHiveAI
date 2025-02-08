@@ -24,7 +24,8 @@ export class RedditAdapter extends EventEmitter {
             userAgent: 'DragonbeeBot/1.0.0',
             clientId: config.clientId,
             clientSecret: config.clientSecret,
-            refreshToken: config.refreshToken
+            username: 'put your username here',
+            password: 'put your password here'
         });
 
         // Initialize handlers
