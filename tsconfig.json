@@ -1,32 +1,23 @@
 {
     "compilerOptions": {
-        "target": "ES2022",
-        "module": "ESNext",
-        "moduleResolution": "node",
-        "lib": ["ES2022"],
-        "outDir": "dist",
-        "rootDir": ".",
-        "strict": true,
-        "esModuleInterop": true,
-        "skipLibCheck": true,
-        "forceConsistentCasingInFileNames": true,
-        "resolveJsonModule": true,
-        "declaration": true,
-        "declarationMap": true,
-        "sourceMap": true,
-        "baseUrl": ".",
-        "paths": {
-            "@hiveAI/core": ["core/src"],
-            "@hiveAI/adapters-*": ["adapters/*/src"],
-            "@hiveAI/services-*": ["services/*/src"]
-        }
+      "target": "ES2020",
+      "module": "ES2020",
+      "moduleResolution": "node",
+      "allowJs": true,
+      "resolveJsonModule": true,
+      "declaration": true,
+      "sourceMap": true,
+      "outDir": "./dist",
+      "rootDir": "./src",
+      "strict": true,
+      "esModuleInterop": true,
+      "skipLibCheck": true,
+      "forceConsistentCasingInFileNames": true,
+      "baseUrl": ".",
+      "paths": {
+        "@hiveai/*": ["packages/*/src"]
+      }
     },
-    "include": [
-        "start_hive_swarm.ts",
-        "services/**/*.ts",
-        "adapters/**/*.ts",
-        "core/**/*.ts",
-        "utils/**/*.ts"
-    ],
+    "include": ["src/**/*", "src/**/*.json"],
     "exclude": ["node_modules", "dist"]
-} 
+  }

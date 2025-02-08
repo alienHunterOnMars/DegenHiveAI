@@ -13,25 +13,14 @@
  */
 
 import { DiscordAdapter } from "@hiveai/adapters-discord";
-import { Logger } from "./utils/logger";
+import { Logger } from "@hiveai/utils";
 import { readFileSync } from 'fs';
 import { TelegramAdapter } from '@hiveai/adapters-telegram';
 import { RedditAdapter } from '@hiveai/adapters-reddit';
 import { TwitterAdapter } from '@hiveai/adapters-twitter';
 import { FarcasterAdapter } from '@hiveai/adapters-farcaster';
 import { EmailAdapter } from '@hiveai/adapters-email';
-
-// cd core && pnpm build
-// cd ../utils && pnpm build
-// cd ../messaging && pnpm build
-// cd ../adapters/telegram && pnpm build
-// cd ../discord && pnpm build
-// cd ../reddit && pnpm build
-// cd ../twitter && pnpm build
-// cd ../farcaster && pnpm build
-// cd ../email && pnpm build
-// cd ../.. && pnpm install
-
+ 
 // ----------------------------------------------------------------------------
 // Plugin Interfaces and Manager
 // ----------------------------------------------------------------------------
@@ -127,29 +116,29 @@ class HiveSwarm {
         try {
             Logger.info('Starting HiveAI Swarm...');
 
-            // Initialize Discord adapter
-            const discordAdapter = new DiscordAdapter(this.config.discord);
-            this.adapters.set('discord', discordAdapter);
+            // // Initialize Discord adapter
+            // const discordAdapter = new DiscordAdapter(this.config.discord);
+            // this.adapters.set('discord', discordAdapter);
 
             // Initialize Telegram adapter
             const telegramAdapter = new TelegramAdapter(this.config.telegram);
             this.adapters.set('telegram', telegramAdapter);
 
-            // Initialize Reddit adapter
-            const redditAdapter = new RedditAdapter(this.config.reddit);
-            this.adapters.set('reddit', redditAdapter);
+            // // Initialize Reddit adapter
+            // const redditAdapter = new RedditAdapter(this.config.reddit);
+            // this.adapters.set('reddit', redditAdapter);
 
-            // Initialize Twitter adapter
-            const twitterAdapter = new TwitterAdapter(this.config.twitter);
-            this.adapters.set('twitter', twitterAdapter);
+            // // Initialize Twitter adapter
+            // const twitterAdapter = new TwitterAdapter(this.config.twitter);
+            // this.adapters.set('twitter', twitterAdapter);
 
-            // Initialize Farcaster adapter
-            const farcasterAdapter = new FarcasterAdapter(this.config.farcaster);
-            this.adapters.set('farcaster', farcasterAdapter);
+            // // Initialize Farcaster adapter
+            // const farcasterAdapter = new FarcasterAdapter(this.config.farcaster);
+            // this.adapters.set('farcaster', farcasterAdapter);
 
-            // Initialize Email adapter
-            const emailAdapter = new EmailAdapter(this.config.email);
-            this.adapters.set('email', emailAdapter);
+            // // Initialize Email adapter
+            // const emailAdapter = new EmailAdapter(this.config.email);
+            // this.adapters.set('email', emailAdapter);
 
             // Start all adapters
             await Promise.all([...this.adapters.values()].map(adapter => adapter.start()));
@@ -202,3 +191,5 @@ if (process.env.PREVENT_UNHANDLED_EXIT === "true") {
         Logger.error("unhandledRejection", err);
     });
 }
+
+export { HiveSwarm }; 
