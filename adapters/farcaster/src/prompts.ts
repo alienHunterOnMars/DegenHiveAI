@@ -1,8 +1,3 @@
-import {
-    type Character,
-    messageCompletionFooter,
-    shouldRespondFooter,
-} from "@hiveai/core";
 import type { Cast } from "./types";
 
 export const formatCast = (cast: Cast) => {
@@ -12,11 +7,13 @@ Text: ${cast.text}`;
 };
 
 export const formatTimeline = (
-    character: Character,
+    character: any,
     timeline: Cast[]
 ) => `# ${character.name}'s Home Timeline
 ${timeline.map(formatCast).join("\n")}
 `;
+
+
 
 export const headerTemplate = `
 {{timeline}}
@@ -86,3 +83,17 @@ Current message:
 {{currentPost}}
 
 ` + shouldRespondFooter;
+
+
+export const messageCompletionFooter = `\nResponse format should be formatted in a valid JSON block like this:
+\`\`\`json
+{ "user": "{{agentName}}", "text": "<string>", "action": "<string>" }
+\`\`\`
+
+The “action” field should be one of the options in [Available Actions] and the "text" field should be the response you want to send.
+`;
+
+export const shouldRespondFooter = `The available options are [RESPOND], [IGNORE], or [STOP]. Choose the most appropriate option.
+If {{agentName}} is talking too much, you can choose [IGNORE]
+
+Your response must include one of the options.`;

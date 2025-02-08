@@ -1,8 +1,3 @@
-import {
-    type IAgentRuntime,
-    ModelClass,
-    stringToUuid,
-} from "@hiveai/core";
 import { Logger } from "@hiveai/utils";
 import type { FarcasterClient } from "./client";
 import { formatTimeline, postTemplate } from "./prompts";
@@ -19,7 +14,7 @@ export class FarcasterPostManager {
 
     constructor(
         client: FarcasterClient,
-        runtime: IAgentRuntime,
+        runtime: any,
         private signerUuid: string,
         public cache: Map<string, any>
     ) {

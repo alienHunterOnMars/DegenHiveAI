@@ -1,4 +1,3 @@
-import { type Client, type IAgentRuntime } from "@hiveai/core";
 import { FarcasterClient } from "./client";
 import { FarcasterPostManager } from "./post";
 import { FarcasterInteractionManager } from "./interactions";
@@ -20,7 +19,7 @@ class FarcasterManager {
     interactions: FarcasterInteractionManager;
     private signerUuid: string;
 
-    constructor(runtime: IAgentRuntime, farcasterConfig: FarcasterAdapterConfig) {
+    constructor(runtime: any, farcasterConfig: FarcasterAdapterConfig) {
         const cache = new Map<string, any>();
         this.signerUuid = runtime.getSetting("FARCASTER_NEYNAR_SIGNER_UUID")!;
 
@@ -66,8 +65,8 @@ class FarcasterManager {
     }
 }
 
-export const FarcasterClientInterface: Client = {
-    async start(runtime: IAgentRuntime) {
+export const FarcasterClientInterface: any = {
+    async start(runtime: any) {
         const farcasterConfig = await validateFarcasterConfig(runtime);
 
         Logger.log("Farcaster client started");
@@ -82,7 +81,7 @@ export const FarcasterClientInterface: Client = {
         return manager;
     },
 
-    async stop(runtime: IAgentRuntime) {
+    async stop(runtime: any) {
         try {
             // stop it
             Logger.log("Stopping farcaster client", runtime.agentId);
@@ -120,7 +119,7 @@ export class FarcasterAdapter extends EventEmitter {
             runtime: {
                 agentId: "farcaster-adapter",
                 getSetting: () => undefined
-            } as IAgentRuntime,
+            } as any,
             url: config.hubUrl,
             ssl: true,
             neynar: new NeynarAPIClient({ apiKey: config.apiKey }),

@@ -1,9 +1,7 @@
-import {
-    parseBooleanFromText,
-    type IAgentRuntime,
-    ActionTimelineType,
-} from "@hiveai/core";
 import { z, ZodError } from "zod";
+import { parseBooleanFromText } from "./utils";
+import { ActionTimelineType } from "./types";
+
 
 export const DEFAULT_MAX_CAST_LENGTH = 320;
 const DEFAULT_POLL_INTERVAL= 120; // 2 minutes
@@ -45,7 +43,7 @@ function safeParseInt(
  * taking values from the IAgentRuntime or process.env as needed.
  */
 export async function validateFarcasterConfig(
-    runtime: IAgentRuntime
+    runtime: any
     ): Promise<FarcasterAdapterConfig> {
     try {
         const farcasterConfig = {

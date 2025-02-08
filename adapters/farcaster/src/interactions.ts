@@ -1,13 +1,4 @@
-import {
-    // generateMessageResponse,
-    // generateShouldRespond,
-    // type Memory,
-    // ModelClass,
-    stringToUuid,
-    // type HandlerCallback,
-    // type Content,
-    // type IAgentRuntime,
-} from "@hiveai/core";
+import { stringToUuid } from "./utils";
 import type { FarcasterClient } from "./client";
 import { toHex } from "viem";
 import { buildConversationThread, createCastMemory } from "./memory";

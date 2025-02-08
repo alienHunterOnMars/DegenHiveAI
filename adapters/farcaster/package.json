@@ -19,11 +19,12 @@
 	],
 	"dependencies": {
 		"@farcaster/hub-nodejs": "^0.10.0",
-		"@hiveai/core": "workspace:*",
 		"@hiveai/messaging": "workspace:*",
 		"@hiveai/utils": "workspace:*",
 		"@neynar/nodejs-sdk": "^2.0.3",
+		"js-sha1": "^0.7.0",
 		"viem": "^2.22.22",
+		"z": "^1.0.9",
 		"zod": "3.23.8"
 	},
 	"devDependencies": {

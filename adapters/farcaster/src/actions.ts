@@ -1,5 +1,5 @@
 import type { FarcasterClient } from "./client";
-import type { UUID } from "@hiveai/core";
+import type { UUID } from "./types";
 import type { Cast, CastId, Profile } from "./types";
 import { createCastMemory } from "./memory";
 import { splitPostContent } from "./utils";

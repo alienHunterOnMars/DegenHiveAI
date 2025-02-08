@@ -37,3 +37,13 @@ export type FidRequest = {
     fid: number;
     pageSize: number;
 };
+
+export enum ActionTimelineType {
+    ForYou = "foryou",
+    Following = "following",
+}
+
+/**
+ * Represents a UUID string in the format "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+ */
+export type UUID = `${string}-${string}-${string}-${string}-${string}`;

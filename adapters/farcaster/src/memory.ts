@@ -1,10 +1,4 @@
-import {
-    // getEmbeddingZeroVector,
-    type IAgentRuntime,
-    // stringToUuid,
-    // type Memory,
-    type UUID,
-} from "@hiveai/core";
+import { type UUID } from "./types";
 import { Logger } from "@hiveai/utils";
 import type { Cast } from "./types";
 import { toHex } from "viem";
