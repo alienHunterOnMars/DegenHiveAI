@@ -100,6 +100,8 @@ export default FarcasterClientInterface;
 export interface FarcasterConfig {
     apiKey: string;
     username: string;
+    signerUuid: string;
+    hubUrl: string;
     messageBroker?: {
         url: string;
         exchange: string;
@@ -119,10 +121,10 @@ export class FarcasterAdapter extends EventEmitter {
                 agentId: "farcaster-adapter",
                 getSetting: () => undefined
             } as IAgentRuntime,
-            url: "hub.pinata.cloud",
+            url: config.hubUrl,
             ssl: true,
             neynar: new NeynarAPIClient({ apiKey: config.apiKey }),
-            signerUuid: "",
+            signerUuid: config.signerUuid,
             cache: new Map(),
             farcasterConfig: {} as any
         });

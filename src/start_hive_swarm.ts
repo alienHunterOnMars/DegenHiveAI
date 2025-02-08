@@ -133,7 +133,7 @@ class HiveSwarm {
             // const telegramAdapter = new TelegramAdapter(this.config.telegram);
             // this.adapters.set('telegram', telegramAdapter);
 
-            // Initialize Reddit adapter
+            // Initialize Reddit adapterclear
             // const redditAdapter = new RedditAdapter(this.config.reddit);
             // this.adapters.set('reddit', redditAdapter);
 

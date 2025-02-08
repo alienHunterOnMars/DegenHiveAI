@@ -4,19 +4,28 @@
     "private": true,
     "type": "module",
     "scripts": {
-      "build": "tsc && npm run build:core && npm run build:adapters",
-      "build:core": "cd core && npm run build",
-      "build:adapters": "npm run build:discord && npm run build:farcaster && npm run build:reddit && npm run build:telegram && npm run build:twitter",
+      "build": "npm run build:utils && npm run build:messaging && npm run build:core && npm run build:adapters && tsc",
+      "build:utils": "cd utils && npm run build",
+      "build:messaging": "cd messaging && tsc -b",
+      "build:core": "cd core && tsc -b",
+      "build:adapters": "npm run build:discord && npm run build:farcaster && npm run build:reddit && npm run build:telegram && npm run build:twitter && npm run build:email",
       "build:discord": "cd adapters/discord && npm run build",
       "build:farcaster": "cd adapters/farcaster && npm run build",
       "build:reddit": "cd adapters/reddit && npm run build",
       "build:telegram": "cd adapters/telegram && npm run build",
       "build:twitter": "cd adapters/twitter && npm run build",
+      "build:email": "cd adapters/email && npm run build",
       "start": "node --experimental-modules --es-module-specifier-resolution=node dist/start_hive_swarm.js",
       "dev": "ts-node src/start_hive_swarm.ts",
-      "clean": "rm -rf dist",
+      "clean": "rm -rf dist && npm run clean:core && npm run clean:adapters",
+      "clean:core": "cd core && rm -rf dist",
+      "clean:adapters": "cd adapters && for d in */; do rm -rf \"$d/dist\"; done",
       "prebuild": "npm run clean"
     },
+     "workspaces": [
+        "core",
+        "adapters/*"
+      ],
     "dependencies": {
         "@hiveai/adapters-discord": "workspace:*",
         "@hiveai/adapters-reddit": "workspace:*",
