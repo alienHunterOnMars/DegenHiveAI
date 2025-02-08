@@ -142,12 +142,12 @@ class HiveSwarm {
             // this.adapters.set('twitter', twitterAdapter);
 
             // // Initialize Farcaster adapter
-            const farcasterAdapter = new FarcasterAdapter(this.config.farcaster);
-            this.adapters.set('farcaster', farcasterAdapter);
+            // const farcasterAdapter = new FarcasterAdapter(this.config.farcaster);
+            // this.adapters.set('farcaster', farcasterAdapter);
 
             // // Initialize Email adapter
-            // const emailAdapter = new EmailAdapter(this.config.email);
-            // this.adapters.set('email', emailAdapter);
+            const emailAdapter = new EmailAdapter(this.config.email);
+            this.adapters.set('email', emailAdapter);
 
             // Start all adapters
             await Promise.all([...this.adapters.values()].map(adapter => adapter.start()));

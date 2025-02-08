@@ -14,17 +14,23 @@
             }
         }
     },
-    "files": ["dist"],
+    "files": [
+        "dist"
+    ],
     "dependencies": {
-        "@hiveai/utils": "workspace:*",
         "@hiveai/messaging": "workspace:*",
-        "nodemailer": "^6.9.0",
-        "events": "^3.3.0"
+        "@hiveai/utils": "workspace:*",
+        "events": "^3.3.0",
+        "mailparser": "^3.7.2",
+        "node-imap": "^0.9.6",
+        "nodemailer": "^6.9.0"
     },
     "devDependencies": {
-        "@types/node": "^20.0.0",
-        "@types/nodemailer": "^6.4.0",
         "@types/events": "^3.0.3",
+        "@types/mailparser": "^3.4.0",
+        "@types/node": "^20.0.0",
+        "@types/node-imap": "^0.9.0",
+        "@types/nodemailer": "^6.4.0",
         "tsup": "8.3.5",
         "typescript": "^5.0.0"
     },

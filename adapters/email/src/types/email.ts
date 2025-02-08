@@ -1,4 +1,3 @@
-import type { Service } from "@hiveai/core";
 import type { EmailContent } from "mail-notifier";
 
 interface EmailAttachment {
@@ -26,7 +25,7 @@ export interface EmailResponse {
     error?: string;
 }
 
-export interface IEmailService extends Service {
+export interface IEmailService {
     send(options: SendEmailOptions): Promise<EmailResponse>;
     receive(callback: (mail: EmailContent) => void): void;
 }

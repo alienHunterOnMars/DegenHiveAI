@@ -1,4 +1,3 @@
-import { elizaLogger, type IAgentRuntime } from "@hiveai/core";
 import {
     EmailOutgoingProvider,
     EmailIncomingProvider,
@@ -7,6 +6,7 @@ import {
     type IncomingConfig,
     type SmtpConfig,
 } from "../types/config";
+import { Logger } from "@hiveai/utils";
 import { z } from "zod";
 
 // Define the schema for other providers
@@ -36,9 +36,9 @@ const ImapConfigSchema = z.object({
 
 // Function to validate EmailConfig
 export function validateOutgoingEmailConfig(
-    runtime: IAgentRuntime
-): OutgoingConfig {
-    elizaLogger.debug("Verifying email service settings...");
+    runtime: any
+): OutgoingConfig | null {
+    Logger.debug("Verifying email service settings...");
     try {
         let config: GmailConfig | SmtpConfig;
         let result;
@@ -47,7 +47,7 @@ export function validateOutgoingEmailConfig(
             process.env.EMAIL_PROVIDER;
 
         if (!provider) {
-            elizaLogger.warn("Email outgoing service not set.");
+            Logger.warn("Email outgoing service not set.");
             return null;
         }
         switch (provider?.toLowerCase()) {
@@ -87,7 +87,7 @@ export function validateOutgoingEmailConfig(
                 result = SmtpConfigSchema.safeParse(config);
                 break;
             default:
-                elizaLogger.warn(
+                Logger.warn(
                     `Email provider not supported: ${provider}. Please use one of the following supported providers: "smtp" or "gmail".`
                 );
                 return null;
@@ -113,13 +113,13 @@ export function validateOutgoingEmailConfig(
 }
 
 export function validateIncomingEmailConfig(
-    runtime: IAgentRuntime
-): IncomingConfig {
+    runtime: any
+): IncomingConfig | null {
     const provider =
         runtime.getSetting("EMAIL_INCOMING_SERVICE") ||
         process.env.EMAIL_INCOMING_SERVICE;
     if (!provider) {
-        elizaLogger.warn("Email incoming service not set.");
+        Logger.warn("Email incoming service not set.");
         return null;
     }
     const config = {

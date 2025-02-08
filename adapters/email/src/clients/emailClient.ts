@@ -1,10 +1,5 @@
-import {
-    type Client,
-    elizaLogger,
-    type IAgentRuntime,
-    ServiceType,
-} from "@hiveai/core";
 import MailNotifier, { type Config, type EmailContent } from "mail-notifier";
+import { Logger } from "@hiveai/utils";
 import nodemailer, { type Transporter } from "nodemailer";
 import {
     validateIncomingEmailConfig,
@@ -55,11 +50,11 @@ class IncomingEmailManager extends EventEmitter {
     listen(callback: (mail: EmailContent) => void) {
         this.notifier.on("mail", callback);
     }
-    static getInstance(config: IncomingConfig): IncomingEmailManager {
+    static getInstance(config: IncomingConfig | null): IncomingEmailManager | null {
         if (!IncomingEmailManager.instance) {
             if (!config) {
                 // TODO - check the condition to enable Smtp
-                elizaLogger.warn(
+                Logger.warn(
                     "IMAP configuration is missing. Unable to receive emails."
                 );
                 return null;
@@ -110,7 +105,7 @@ class OutgoingEmailManager {
     }
     async send(options: SendEmailOptions): Promise<EmailResponse> {
         const mailOptions = {
-            from: options.from || this.config.user,
+            from: options.from || this.config?.user,
             to: options.to,
             subject: options.subject,
             text: options.text,
@@ -118,11 +113,11 @@ class OutgoingEmailManager {
         return await this.transporter?.sendMail(mailOptions);
     }
 
-    static getInstance(config: OutgoingConfig): OutgoingEmailManager {
+    static getInstance(config: OutgoingConfig | null): OutgoingEmailManager | null {
         if (!OutgoingEmailManager.instance) {
             if (!config) {
                 // TODO - check the condition to enable Smtp
-                elizaLogger.warn(
+                Logger.warn(
                     "SMTP configuration is missing. Unable to send emails."
                 );
                 return null;
@@ -133,14 +128,14 @@ class OutgoingEmailManager {
     }
 }
 export class EmailClient {
-    private runtime: IAgentRuntime;
+    private runtime: any;
     private incomingConfig: IncomingConfig | null = null;
     private outgoingConfig: OutgoingConfig | null = null;
 
     private outgoingEmailManager: OutgoingEmailManager | null = null;
     private incomingEmailManager: IncomingEmailManager | null = null;
 
-    constructor(runtime: IAgentRuntime) {
+    constructor(runtime: any) {
         this.runtime = runtime;
     }
     async initialize(): Promise<void> {
@@ -159,7 +154,7 @@ export class EmailClient {
         }
         const incomingStatus = this.incomingEmailManager ? "✅ " : "❌ ";
         const outgoingStatus = this.outgoingEmailManager ? "✅ " : "❌ ";
-        elizaLogger.info(
+        Logger.info(
             `Email service initialized successfully: ${incomingStatus}Incoming - ${outgoingStatus}Outgoing`
         );
     }
@@ -187,17 +182,19 @@ export class EmailClient {
         this.incomingEmailManager?.listen(callback);
     }
 }
-interface ClientWithType extends Client {
+interface ClientWithType  {
     type: string;
+    start: (runtime: any) => Promise<EmailClient>;
+    stop: (runtime: any) => Promise<void>;
 }
 export const EmailClientInterface: ClientWithType = {
     type: "email",
-    start: async (runtime: IAgentRuntime) => {
+    start: async (runtime: any) => {
         const client = new EmailClient(runtime);
         await client.initialize();
         return client;
     },
-    stop: async (_runtime: IAgentRuntime) => {
+    stop: async (_runtime: any) => {
         console.warn("Email client does not support stopping yet");
     },
 };
