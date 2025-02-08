@@ -30,7 +30,13 @@ export class TelegramAdapter extends EventEmitter {
     constructor(config: TelegramConfig) {
         super();
         this.config = config;
+
+        Logger.info(" adapters/telegram/src/index.ts");
+        Logger.info(this.config);
+
+
         this.client = new TelegramClient(config);
+
 
         if (config.messageBroker) {
             this.messageBroker = new MessageBroker({
@@ -128,8 +134,7 @@ export class TelegramAdapter extends EventEmitter {
             payload: {
                 content,
                 timestamp: Date.now()
-            },
-            timestamp: Date.now()
+            }
         });
     }
 }

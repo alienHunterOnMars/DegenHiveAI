@@ -121,6 +121,7 @@ class HiveSwarm {
             // this.adapters.set('discord', discordAdapter);
 
             // Initialize Telegram adapter
+            console.log(this.config.telegram);
             const telegramAdapter = new TelegramAdapter(this.config.telegram);
             this.adapters.set('telegram', telegramAdapter);
 

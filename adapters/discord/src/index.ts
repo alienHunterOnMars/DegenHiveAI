@@ -204,8 +204,7 @@ export class DiscordAdapter extends EventEmitter {
             payload: {
                 content,
                 timestamp: Date.now()
-            },
-            timestamp: Date.now()
+            }
         });
     }
 } 
