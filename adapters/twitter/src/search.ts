@@ -1,20 +1,24 @@
 import { SearchMode } from "agent-twitter-client";
-// import { composeContext } from "@hiveai/core";
-import { generateMessageResponse, generateText } from "@hiveai/core";
-import { messageCompletionFooter } from "@hiveai/core";
 import { Logger } from "@hiveai/utils";
 import {
     type Content,
-    type HandlerCallback,
-    type IAgentRuntime,
     type IImageDescriptionService,
     ModelClass,
     ServiceType,
     type State,
-} from "@hiveai/core";
-import { stringToUuid } from "@hiveai/core";
+} from "./types";
+import { stringToUuid } from "./utils";
 import type { ClientBase } from "./base";
 import { buildConversationThread, sendTweet, wait } from "./utils";
+
+export const messageCompletionFooter = `\nResponse format should be formatted in a valid JSON block like this:
+\`\`\`json
+{ "user": "{{agentName}}", "text": "<string>", "action": "<string>" }
+\`\`\`
+
+The “action” field should be one of the options in [Available Actions] and the "text" field should be the response you want to send.
+`;
+
 
 const twitterSearchTemplate =
     `{{timeline}}
@@ -42,6 +46,10 @@ Aim for 1-2 short sentences maximum. Be concise and direct.
 Your response should not contain any questions. Brief, concise statements only. No emojis. Use \\n\\n (double spaces) between statements.
 
 ` + messageCompletionFooter;
+
+
+
+
 
 export class TwitterSearchClient {
     client: ClientBase;
@@ -142,11 +150,12 @@ export class TwitterSearchClient {
     - Respond to tweets where there is an easy exchange of ideas to have with the user
     - ONLY respond with the ID of the tweet`;
 
-            const mostInterestingTweetResponse = await generateText({
-                runtime: this.runtime,
-                context: prompt,
-                modelClass: ModelClass.SMALL,
-            });
+            const mostInterestingTweetResponse = "mostInterestingTweetResponse"
+            // await generateText({
+            //     runtime: this.runtime,
+            //     context: prompt,
+            //     modelClass: ModelClass.SMALL,
+            // });
 
             const tweetId = mostInterestingTweetResponse.trim();
             const selectedTweet = slicedTweets.find(
@@ -261,11 +270,12 @@ export class TwitterSearchClient {
             // });
             let context = "";
 
-            const responseContent = await generateMessageResponse({
-                runtime: this.runtime,
-                context,
-                modelClass: ModelClass.LARGE,
-            });
+            const responseContent = "responseContent"
+            // await generateMessageResponse({
+            //     runtime: this.runtime,
+            //     context,
+            //     modelClass: ModelClass.LARGE,
+            // });
 
             responseContent.inReplyTo = message.id;
 

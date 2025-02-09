@@ -1,10 +1,6 @@
-import {
-    parseBooleanFromText,
-    type IAgentRuntime,
-    ActionTimelineType,
-} from "@hiveai/core";
+import { ActionTimelineType } from "./types";
 import { z, ZodError } from "zod";
-
+import { parseBooleanFromText } from "./utils";
 export const DEFAULT_MAX_TWEET_LENGTH = 280;
 
 const twitterUsernameSchema = z
@@ -118,7 +114,7 @@ function safeParseInt(
 // we also do a lot of typing/parsing here
 // so we can do it once and only once per character
 export async function validateTwitterConfig(
-    runtime: IAgentRuntime
+    runtime: any
 ): Promise<TwitterConfig> {
     try {
         const twitterConfig = {

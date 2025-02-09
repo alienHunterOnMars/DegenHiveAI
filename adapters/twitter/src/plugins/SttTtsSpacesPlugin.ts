@@ -3,26 +3,20 @@
 import { spawn } from "child_process";
 import {
     type ITranscriptionService,
-    stringToUuid,
     // composeContext,
-    getEmbeddingZeroVector,
-    generateMessageResponse,
     ModelClass,
     type Content,
-    type IAgentRuntime,
     type Memory,
-    type Plugin,
-    type UUID,
     type State,
     // composeRandomUser,
-    generateShouldRespond,
-} from "@hiveai/core";
+} from "../types";
 import { Logger } from "@hiveai/utils";
 import type {
     Space,
     JanusClient,
     AudioDataWithUser,
 } from "agent-twitter-client";
+import { stringToUuid } from "../utils";
 import type { ClientBase } from "../base";
 import {
     twitterVoiceHandlerTemplate,
@@ -30,7 +24,7 @@ import {
 } from "./templates";
 
 interface PluginConfig {
-    runtime: IAgentRuntime;
+    runtime: any;
     client: ClientBase;
     spaceId: string;
     elevenLabsApiKey?: string; // for TTS
@@ -55,7 +49,7 @@ const SILENCE_DETECTION_THRESHOLD_MS = 1000; // 1-second silence threshold
  *   - Collect each speaker's unmuted PCM in a memory buffer (only if above silence threshold)
  *   - On speaker mute -> flush STT -> GPT -> TTS -> push to Janus
  */
-export class SttTtsPlugin implements Plugin {
+export class SttTtsPlugin   {
     name = "SttTtsPlugin";
     description = "Speech-to-text (OpenAI) + conversation + TTS (ElevenLabs)";
     clients = [];
@@ -433,18 +427,18 @@ export class SttTtsPlugin implements Plugin {
             },
         );
 
-        const memory = {
-            id: stringToUuid(`${roomId}-voice-message-${Date.now()}`),
-            agentId: this.runtime.agentId,
-            content: {
-                text: userText,
-                source: "twitter",
-            },
-            userId: userUuid,
-            roomId,
-            embedding: getEmbeddingZeroVector(),
-            createdAt: Date.now(),
-        };
+        const memory: any = { };
+        //     id: stringToUuid(`${roomId}-voice-message-${Date.now()}`),
+        //     agentId: this.runtime.agentId,
+        //     content: {
+        //         text: userText,
+        //         source: "twitter",
+        //     },
+        //     userId: userUuid,
+        //     roomId,
+        //     embedding: getEmbeddingZeroVector(),
+        //     createdAt: Date.now(),
+        // };
 
         await this.runtime.messageManager.createMemory(memory);
 
@@ -473,18 +467,18 @@ export class SttTtsPlugin implements Plugin {
 
         const responseContent = await this._generateResponse(memory, context);
 
-        const responseMemory: Memory = {
-            id: stringToUuid(`${memory.id}-voice-response-${Date.now()}`),
-            agentId: this.runtime.agentId,
-            userId: this.runtime.agentId,
-            content: {
-                ...responseContent,
-                user: this.runtime.character.name,
-                inReplyTo: memory.id,
-            },
-            roomId,
-            embedding: getEmbeddingZeroVector(),
-        };
+        const responseMemory: any = { };
+            // id: stringToUuid(`${memory.id}-voice-response-${Date.now()}`),
+        //     agentId: this.runtime.agentId,
+        //     userId: this.runtime.agentId,
+        //     content: {
+        //         ...responseContent,
+        //         user: this.runtime.character.name,
+        //         inReplyTo: memory.id,
+        //     },
+        //     roomId,
+        //     embedding: getEmbeddingZeroVector(),
+        // };
 
         const reply = responseMemory.content.text?.trim();
         if (reply) {
@@ -500,11 +494,12 @@ export class SttTtsPlugin implements Plugin {
     ): Promise<any> {
         const { userId, roomId } = message;
 
-        const response = await generateMessageResponse({
-            runtime: this.runtime,
-            context,
-            modelClass: ModelClass.SMALL,
-        });
+        const response : any = "";
+        //     await generateMessageResponse({
+        //         runtime: this.runtime,
+        //         context,
+        //         modelClass: ModelClass.SMALL,
+        // });
 
         response.source = "discord";
 
@@ -599,11 +594,12 @@ export class SttTtsPlugin implements Plugin {
         // });
         const shouldRespondContext = "";
 
-        const response = await generateShouldRespond({
-            runtime: this.runtime,
-            context: shouldRespondContext,
-            modelClass: ModelClass.SMALL,
-        });
+        const response : any = "";
+        //     await generateShouldRespond({
+        //         runtime: this.runtime,
+        //         context: shouldRespondContext,
+        //         modelClass: ModelClass.SMALL,
+        //     });
 
         if (response === "RESPOND") {
             return true;

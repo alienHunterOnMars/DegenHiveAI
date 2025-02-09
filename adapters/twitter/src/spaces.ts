@@ -1,12 +1,4 @@
-import {
-    type IAgentRuntime,
-    // composeContext,
-    generateText,
-    ModelClass,
-    ServiceType,
-    type ITranscriptionService,
-    type TwitterSpaceDecisionOptions,
-} from "@hiveai/core";
+import { type TwitterSpaceDecisionOptions, ModelClass, ServiceType } from "./types";
 import type { ClientBase } from "./base";
 import {
     type Scraper,
@@ -50,11 +42,12 @@ async function generateFiller(
 
 
         
-        const output = await generateText({
-            runtime,
-            context,
-            modelClass: ModelClass.SMALL,
-        });
+        const output = "";
+        //  await generateText({
+        //     runtime,
+        //     context,
+        //     modelClass: ModelClass.SMALL,
+        // });
         return output.trim();
     } catch (err) {
         Logger.error("[generateFiller] Error generating filler:", err);
@@ -103,11 +96,12 @@ async function generateTopicsIfEmpty(
 // `,
 //         });
         const context = "";
-        const response = await generateText({
-            runtime,
-            context,
-            modelClass: ModelClass.SMALL,
-        });
+        const response = "";
+        //  await generateText({
+        //     runtime,
+        //     context,
+        //     modelClass: ModelClass.SMALL,
+        // });
         const topics = response
             .split(",")
             .map((t) => t.trim())

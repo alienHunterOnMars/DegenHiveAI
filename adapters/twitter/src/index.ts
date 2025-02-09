@@ -1,4 +1,3 @@
-import { type Client, type IAgentRuntime } from "@hiveai/core";
 import { ClientBase } from "./base";
 import { validateTwitterConfig, type TwitterConfig } from "./environment";
 import { TwitterInteractionClient } from "./interactions";
@@ -25,7 +24,7 @@ class TwitterManager {
     space?: TwitterSpaceClient;
     private messageBroker?: MessageBroker;
 
-    constructor(runtime: IAgentRuntime, twitterConfig: TwitterConfig) {
+    constructor(runtime: any, twitterConfig: TwitterConfig) {
         // Pass twitterConfig to the base client
         this.client = new ClientBase(runtime, twitterConfig);
 
@@ -114,8 +113,8 @@ class TwitterManager {
     }
 }
 
-export const TwitterClientInterface: Client = {
-    async start(runtime: IAgentRuntime): Promise<TwitterManager> {
+export const TwitterClientInterface: any = {
+    async start(runtime: any): Promise<TwitterManager> {
         const twitterConfig: TwitterConfig =
             await validateTwitterConfig(runtime);
 
@@ -145,7 +144,7 @@ export const TwitterClientInterface: Client = {
         return manager;
     },
 
-    async stop(_runtime: IAgentRuntime) {
+    async stop(_runtime: any) {
         Logger.warn("Twitter client does not support stopping yet");
     },
 };

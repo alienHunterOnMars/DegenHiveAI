@@ -1,23 +1,14 @@
 import type { Tweet } from "agent-twitter-client";
 import {
-    // composeContext,
-    generateText,
-    getEmbeddingZeroVector,
+    // getEmbeddingZeroVector,
     ModelClass,
-    stringToUuid,
     type TemplateType,
     type UUID,
-    truncateToCompleteSentence,
-    parseJSONObjectFromText,
-    extractAttributes,
-    cleanJsonResponse,
-} from "@hiveai/core";
+} from "./types";
 import { Logger } from "@hiveai/utils";
 import type { ClientBase } from "./base.ts";
-import { postActionResponseFooter } from "@hiveai/core";
-import { generateTweetActions } from "@hiveai/core";
-import { type IImageDescriptionService, ServiceType } from "@hiveai/core";
-import { buildConversationThread, fetchMediaData } from "./utils";
+import { type IImageDescriptionService, ServiceType } from "./types";
+import { cleanJsonResponse, extractAttributes, parseJSONObjectFromText, truncateToCompleteSentence, buildConversationThread, fetchMediaData, stringToUuid } from "./utils";
 import { twitterMessageHandlerTemplate } from "./interactions";
 import { DEFAULT_MAX_TWEET_LENGTH } from "./environment";
 import {
@@ -27,11 +18,15 @@ import {
     TextChannel,
     Partials,
 } from "discord.js";
-import type { State } from "@hiveai/core";
-import type { ActionResponse } from "@hiveai/core";
+import type { State } from "./types";
+import type { ActionResponse } from "./types";
 import { MediaData } from "./types";
 
 const MAX_TIMELINES_TO_FETCH = 15;
+
+
+export const postActionResponseFooter = `Choose any combination of [LIKE], [RETWEET], [QUOTE], and [REPLY] that are appropriate. Each action must be on its own line. Your response must only include the chosen actions.`;
+
 
 const twitterPostTemplate = `
 # Areas of Expertise
@@ -360,20 +355,20 @@ export class TwitterPostClient {
         await runtime.ensureRoomExists(roomId);
         await runtime.ensureParticipantInRoom(runtime.agentId, roomId);
 
-        // Create a memory for the tweet
-        await runtime.messageManager.createMemory({
-            id: stringToUuid(tweet.id + "-" + runtime.agentId),
-            userId: runtime.agentId,
-            agentId: runtime.agentId,
-            content: {
-                text: rawTweetContent.trim(),
-                url: tweet.permanentUrl,
-                source: "twitter",
-            },
-            roomId,
-            embedding: getEmbeddingZeroVector(),
-            createdAt: tweet.timestamp,
-        });
+        // // Create a memory for the tweet
+        // await runtime.messageManager.createMemory({
+        //     id: stringToUuid(tweet.id + "-" + runtime.agentId),
+        //     userId: runtime.agentId,
+        //     agentId: runtime.agentId,
+        //     content: {
+        //         text: rawTweetContent.trim(),
+        //         url: tweet.permanentUrl,
+        //         source: "twitter",
+        //     },
+        //     roomId,
+        //     embedding: getEmbeddingZeroVector(),
+        //     createdAt: tweet.timestamp,
+        // });
     }
 
     async handleNoteTweet(
@@ -532,11 +527,12 @@ export class TwitterPostClient {
 
             Logger.debug("generate post prompt:\n" + context);
 
-            const response = await generateText({
-                runtime: this.runtime,
-                context,
-                modelClass: ModelClass.SMALL,
-            });
+            const response = "response"
+            // await generateText({
+            //     runtime: this.runtime,
+            //     context,
+            //     modelClass: ModelClass.SMALL,
+            // });
 
             const rawTweetContent = cleanJsonResponse(response);
 
@@ -650,11 +646,12 @@ export class TwitterPostClient {
         // });
         const context = "";
 
-        const response = await generateText({
-            runtime: this.runtime,
-            context: options?.context || context,
-            modelClass: ModelClass.SMALL,
-        });
+        const response = "response"
+        // await generateText({
+        //     runtime: this.runtime,
+        //     context: options?.context || context,
+        //     modelClass: ModelClass.SMALL,
+        // });
 
         Logger.log("generate tweet content response:\n" + response);
 
@@ -775,11 +772,12 @@ export class TwitterPostClient {
                     // });
                     const actionContext = "";
 
-                    const actionResponse = await generateTweetActions({
-                        runtime: this.runtime,
-                        context: actionContext,
-                        modelClass: ModelClass.SMALL,
-                    });
+                    const actionResponse = "actionResponse"
+                    // await generateTweetActions({
+                    //     runtime: this.runtime,
+                    //     context: actionContext,
+                    //     modelClass: ModelClass.SMALL,
+                    // });
 
                     if (!actionResponse) {
                         Logger.log(
@@ -1085,23 +1083,23 @@ export class TwitterPostClient {
                     roomId
                 );
 
-                if (!this.isDryRun) {
-                    // Then create the memory
-                    await this.runtime.messageManager.createMemory({
-                        id: stringToUuid(tweet.id + "-" + this.runtime.agentId),
-                        userId: stringToUuid(tweet.userId || ""),
-                        content: {
-                            text: tweet.text,
-                            url: tweet.permanentUrl,
-                            source: "twitter",
-                            action: executedActions.join(","),
-                        },
-                        agentId: this.runtime.agentId,
-                        roomId,
-                        embedding: getEmbeddingZeroVector(),
-                        createdAt: tweet.timestamp ? tweet.timestamp * 1000 : 0,
-                    });
-                }
+                // if (!this.isDryRun) {
+                //     // Then create the memory
+                //     await this.runtime.messageManager.createMemory({
+                //         id: stringToUuid(tweet.id + "-" + this.runtime.agentId),
+                //         userId: stringToUuid(tweet.userId || ""),
+                //         content: {
+                //             text: tweet.text,
+                //             url: tweet.permanentUrl,
+                //             source: "twitter",
+                //             action: executedActions.join(","),
+                //         },
+                //         agentId: this.runtime.agentId,
+                //         roomId,
+                //         embedding: getEmbeddingZeroVector(),
+                //         createdAt: tweet.timestamp ? tweet.timestamp * 1000 : 0,
+                //     });
+                // }
 
                 results.push({
                     tweetId: tweet.id,

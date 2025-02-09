@@ -1,24 +1,33 @@
 import { SearchMode, type Tweet } from "agent-twitter-client";
 import {
-    composeContext,
-    generateMessageResponse,
-    generateShouldRespond,
-    messageCompletionFooter,
-    shouldRespondFooter,
+    // composeContext,
+    // generateMessageResponse,
+    // generateShouldRespond,
     type Content,
     type HandlerCallback,
-    type IAgentRuntime,
     type Memory,
     ModelClass,
     type State,
-    stringToUuid,
-    getEmbeddingZeroVector,
     type IImageDescriptionService,
     ServiceType
-} from "@hiveai/core";
+} from "./types";
 import { Logger } from "@hiveai/utils";
 import type { ClientBase } from "./base";
-import { buildConversationThread, sendTweet, wait } from "./utils";
+import { stringToUuid, buildConversationThread, sendTweet, wait } from "./utils";
+
+
+export const messageCompletionFooter = `\nResponse format should be formatted in a valid JSON block like this:
+\`\`\`json
+{ "user": "{{agentName}}", "text": "<string>", "action": "<string>" }
+\`\`\`
+
+The “action” field should be one of the options in [Available Actions] and the "text" field should be the response you want to send.
+`;
+
+export const shouldRespondFooter = `The available options are [RESPOND], [IGNORE], or [STOP]. Choose the most appropriate option.
+If {{agentName}} is talking too much, you can choose [IGNORE]
+
+Your response must include one of the options.`;
 
 export const twitterMessageHandlerTemplate =
     `
@@ -95,11 +104,11 @@ Thread of Tweets You Are Replying To:
 
 export class TwitterInteractionClient {
     client: ClientBase;
-    runtime: IAgentRuntime;
+    runtime: any;
     private isDryRun: boolean;
     private twitterUserId: string;
 
-    constructor(client: ClientBase, runtime: IAgentRuntime) {
+    constructor(client: ClientBase, runtime: any) {
         this.client = client;
         this.runtime = runtime;
         this.isDryRun = this.client.twitterConfig.TWITTER_DRY_RUN;
@@ -414,20 +423,22 @@ export class TwitterInteractionClient {
         const validTargetUsersStr =
             this.client.twitterConfig.TWITTER_TARGET_USERS.join(",");
 
-        const shouldRespondContext = composeContext({
-            state,
-            template:
-                (this.runtime as any).character.templates
-                    ?.twitterShouldRespondTemplate ||
-                (this.runtime as any).character?.templates?.shouldRespondTemplate ||
-                twitterShouldRespondTemplate(validTargetUsersStr),
-        });
+        const shouldRespondContext = "shouldRespondContext"
+        // composeContext({
+        //     state,
+        //     template:
+        //         (this.runtime as any).character.templates
+        //             ?.twitterShouldRespondTemplate ||
+        //         (this.runtime as any).character?.templates?.shouldRespondTemplate ||
+        //         twitterShouldRespondTemplate(validTargetUsersStr),
+        // });
 
-        const shouldRespond = await generateShouldRespond({
-            runtime: (this.runtime as any),
-            context: shouldRespondContext,
-            modelClass: ModelClass.MEDIUM,
-        });
+        const shouldRespond :any = "shouldRespond"
+        // await generateShouldRespond({
+        //     runtime: (this.runtime as any),
+        //     context: shouldRespondContext,
+        //     modelClass: ModelClass.MEDIUM,
+        // });
 
         // Promise<"RESPOND" | "IGNORE" | "STOP" | null> {
         if (shouldRespond !== "RESPOND") {
@@ -435,38 +446,40 @@ export class TwitterInteractionClient {
             return { text: "Response Decision:", action: shouldRespond };
         }
 
-        const context = composeContext({
-            state: {
-                ...state,
-                // Convert actionNames array to string
-                actionNames: Array.isArray(state.actionNames)
-                    ? state.actionNames.join(', ')
-                    : state.actionNames || '',
-                actions: Array.isArray(state.actions)
-                    ? state.actions.join('\n')
-                    : state.actions || '',
-                // Ensure character examples are included
-                characterPostExamples: (this.runtime as any).character.messageExamples
-                    ? (this.runtime as any).character.messageExamples
-                        .map((example: any) =>
-                            example.map((msg: any) =>
-                                `${msg.user}: ${msg.content.text}${msg.content.action ? ` [Action: ${msg.content.action}]` : ''}`
-                            ).join('\n')
-                        ).join('\n\n')
-                    : '',
-            },
-            template:
-                (this.runtime as any).character.templates
-                    ?.twitterMessageHandlerTemplate ||
-                (this.runtime as any).character?.templates?.messageHandlerTemplate ||
-                twitterMessageHandlerTemplate,
-        });
+        const context = "context"
+        // composeContext({
+        //     state: {
+        //         ...state,
+        //         // Convert actionNames array to string
+        //         actionNames: Array.isArray(state.actionNames)
+        //             ? state.actionNames.join(', ')
+        //             : state.actionNames || '',
+        //         actions: Array.isArray(state.actions)
+        //             ? state.actions.join('\n')
+        //             : state.actions || '',
+        //         // Ensure character examples are included
+        //         characterPostExamples: (this.runtime as any).character.messageExamples
+        //             ? (this.runtime as any).character.messageExamples
+        //                 .map((example: any) =>
+        //                     example.map((msg: any) =>
+        //                         `${msg.user}: ${msg.content.text}${msg.content.action ? ` [Action: ${msg.content.action}]` : ''}`
+        //                     ).join('\n')
+        //                 ).join('\n\n')
+        //             : '',
+        //     },
+        //     template:
+        //         (this.runtime as any).character.templates
+        //             ?.twitterMessageHandlerTemplate ||
+        //         (this.runtime as any).character?.templates?.messageHandlerTemplate ||
+        //         twitterMessageHandlerTemplate,
+        // });
 
-        const response = await generateMessageResponse({
-            runtime: (this.runtime as any),
-            context,
-            modelClass: ModelClass.LARGE,
-        });
+        const response: any = "response";
+        // await generateMessageResponse({
+        //     runtime: (this.runtime as any),
+        //     context,
+        //     modelClass: ModelClass.LARGE,
+        // });
 
         const removeQuotes = (str: string) =>
             str.replace(/^['"](.*)['"]$/, "$1");
@@ -585,32 +598,32 @@ export class TwitterInteractionClient {
                     "twitter"
                 );
 
-                (this.runtime as any).messageManager.createMemory({
-                    id: stringToUuid(
-                        currentTweet.id + "-" + (this.runtime as any).agentId
-                    ),
-                    agentId: (this.runtime as any).agentId,
-                    content: {
-                        text: currentTweet.text,
-                        source: "twitter",
-                        url: currentTweet.permanentUrl,
-                        imageUrls: currentTweet.photos?.map(photo => photo.url) || [],
-                        inReplyTo: currentTweet.inReplyToStatusId
-                            ? stringToUuid(
-                                  currentTweet.inReplyToStatusId +
-                                      "-" +
-                                      this.runtime.agentId
-                              )
-                            : undefined,
-                    },
-                    createdAt: currentTweet.timestamp ? currentTweet.timestamp * 1000 : 0,
-                    roomId,
-                    userId:
-                        currentTweet.userId === this.twitterUserId
-                            ? (this.runtime as any).agentId
-                            : stringToUuid(currentTweet.userId || ""),
-                    embedding: getEmbeddingZeroVector(),
-                });
+                // (this.runtime as any).messageManager.createMemory({
+                //     id: stringToUuid(
+                //         currentTweet.id + "-" + (this.runtime as any).agentId
+                //     ),
+                //     agentId: (this.runtime as any).agentId,
+                //     content: {
+                //         text: currentTweet.text,
+                //         source: "twitter",
+                //         url: currentTweet.permanentUrl,
+                //         imageUrls: currentTweet.photos?.map(photo => photo.url) || [],
+                //         inReplyTo: currentTweet.inReplyToStatusId
+                //             ? stringToUuid(
+                //                   currentTweet.inReplyToStatusId +
+                //                       "-" +
+                //                       this.runtime.agentId
+                //               )
+                //             : undefined,
+                //     },
+                //     createdAt: currentTweet.timestamp ? currentTweet.timestamp * 1000 : 0,
+                //     roomId,
+                //     userId:
+                //         currentTweet.userId === this.twitterUserId
+                //             ? (this.runtime as any).agentId
+                //             : stringToUuid(currentTweet.userId || ""),
+                //     embedding: getEmbeddingZeroVector(),
+                // });
             }
 
             if (visited.has(currentTweet.id || "")) {

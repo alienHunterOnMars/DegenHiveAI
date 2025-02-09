@@ -1,14 +1,11 @@
 import {
     type Content,
-    type IAgentRuntime,
-    type IImageDescriptionService,
     type Memory,
     type State,
     type UUID,
-    getEmbeddingZeroVector,
-    stringToUuid,
     ActionTimelineType,
-} from "@hiveai/core";
+} from "./types";
+import { stringToUuid } from "./utils";
 import { Logger } from "@hiveai/utils";
 import {
     type QueryTweetsResponse,
@@ -230,7 +227,7 @@ export class ClientBase extends EventEmitter {
         return t;
     }
 
-    constructor(runtime: IAgentRuntime, twitterConfig: TwitterConfig) {
+    constructor(runtime: any, twitterConfig: TwitterConfig) {
         super();
         this.runtime = runtime;
         this.twitterConfig = twitterConfig;
@@ -531,15 +528,15 @@ export class ClientBase extends EventEmitter {
                         break;
                     }
 
-                    await this.runtime.messageManager.createMemory({
-                        id: stringToUuid(tweet.id + "-" + this.runtime.agentId),
-                        userId,
-                        content: content,
-                        agentId: this.runtime.agentId,
-                        roomId,
-                        embedding: getEmbeddingZeroVector(),
-                        createdAt: tweet.timestamp ? tweet.timestamp * 1000 : 0,
-                    });
+                    // await this.runtime.messageManager.createMemory({
+                    //     id: stringToUuid(tweet.id + "-" + this.runtime.agentId),
+                    //     userId,
+                    //     content: content,
+                    //     agentId: this.runtime.agentId,
+                    //     roomId,
+                    //     embedding: getEmbeddingZeroVector(),
+                    //     createdAt: tweet.timestamp ? tweet.timestamp * 1000 : 0,
+                    // });
 
                     await this.cacheTweet(tweet);
                 }
@@ -645,15 +642,15 @@ export class ClientBase extends EventEmitter {
                     : undefined,
             } as Content;
 
-            await this.runtime.messageManager.createMemory({
-                id: stringToUuid(tweet.id + "-" + this.runtime.agentId),
-                userId,
-                content: content,
-                agentId: this.runtime.agentId,
-                roomId,
-                embedding: getEmbeddingZeroVector(),
-                createdAt: tweet.timestamp ? tweet.timestamp * 1000 : 0,
-            });
+            // await this.runtime.messageManager.createMemory({
+            //     id: stringToUuid(tweet.id + "-" + this.runtime.agentId),
+            //     userId,
+            //     content: content,
+            //     agentId: this.runtime.agentId,
+            //     roomId,
+            //     embedding: getEmbeddingZeroVector(),
+            //     createdAt: tweet.timestamp ? tweet.timestamp * 1000 : 0,
+            // });
 
             await this.cacheTweet(tweet);
         }
@@ -685,17 +682,17 @@ export class ClientBase extends EventEmitter {
                 }
             );
 
-            if (
-                recentMessage.length > 0 &&
-                recentMessage[0].content === message.content
-            ) {
-                Logger.debug("Message already saved", recentMessage[0].id);
-            } else {
-                await this.runtime.messageManager.createMemory({
-                    ...message,
-                    embedding: getEmbeddingZeroVector(),
-                });
-            }
+            // if (
+            //     recentMessage.length > 0 &&
+            //     recentMessage[0].content === message.content
+            // ) {
+            //     Logger.debug("Message already saved", recentMessage[0].id);
+            // } else {
+            //     await this.runtime.messageManager.createMemory({
+            //         ...message,
+            //         embedding: getEmbeddingZeroVector(),
+            //     });
+            // }
 
             await this.runtime.evaluate(message, {
                 ...state,

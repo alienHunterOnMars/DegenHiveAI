@@ -1,4 +1,4 @@
-import { messageCompletionFooter, shouldRespondFooter } from "@hiveai/core";
+import { messageCompletionFooter, shouldRespondFooter } from "../interactions";
 
 export const twitterShouldRespondTemplate =
     `# Task: Decide if {{agentName}} should respond.

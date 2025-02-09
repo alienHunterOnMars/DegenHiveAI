@@ -284,6 +284,9 @@ importers:
       events:
         specifier: ^3.3.0
         version: 3.3.0
+      js-sha1:
+        specifier: ^0.7.0
+        version: 0.7.0
       zod:
         specifier: 3.23.8
         version: 3.23.8
