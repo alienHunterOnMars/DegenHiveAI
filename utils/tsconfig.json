@@ -1,11 +1,31 @@
 {
-    "extends": "../tsconfig.json",
     "compilerOptions": {
         "outDir": "./dist",
         "rootDir": "./src",
         "composite": true,
         "declaration": true,
-        "declarationMap": true
+        "declarationMap": true,
+        "esModuleInterop": true,
+        "skipLibCheck": true,
+        "target": "es2020",
+        "module": "esnext",
+        "moduleResolution": "node",
+        "allowJs": true,
+        "resolveJsonModule": true,
+        "baseUrl": ".",
+        "paths": {
+            "@hiveai/*": ["../*/src"]
+        }
     },
-    "include": ["src/**/*"]
-} 
+    "files": [
+        "src/index.ts",
+        "src/parsing.ts",
+        "src/types.ts",
+        "src/logger.ts",
+        "src/models.ts",
+        "src/settings.ts",
+        "src/generation.ts"
+    ],
+    "include": ["src/**/*.ts"],
+    "exclude": ["node_modules", "dist"]
+}

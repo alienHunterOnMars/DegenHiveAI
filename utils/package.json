@@ -14,13 +14,22 @@
             }
         }
     },
-    "files": ["dist"],
+    "files": [
+        "dist"
+    ],
     "scripts": {
-        "build": "tsup src/index.ts --format esm --dts --no-config",
-        "dev": "tsup src/index.ts --format esm --dts --watch"
+        "build": "tsup --config tsup.config.ts",
+        "dev": "tsup --config tsup.config.ts --watch"
     },
     "devDependencies": {
         "tsup": "8.3.5",
         "typescript": "^5.0.0"
+    },
+    "dependencies": {
+        "@ai-sdk/openai": "^1.1.9",
+        "@huggingface/transformers": "^3.3.3",
+        "ai": "^4.1.25",
+        "js-tiktoken": "^1.0.18",
+        "together-ai": "^0.13.0"
     }
-} 
+}
