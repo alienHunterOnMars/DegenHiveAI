@@ -1,6 +1,7 @@
 packages:
   - 'adapters/*'
   - 'services/*'
+  - 'plugins/trustdb/*'
   - 'core'
   - 'utils'
   - 'messaging' 

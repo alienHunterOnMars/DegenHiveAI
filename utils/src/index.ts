@@ -10,5 +10,8 @@ export {
 export * from "./generation";
 export * from "./models";
 export * from "./settings";
-
+export * from "./context";
+export * from "./embedding";
+export * from "./localembeddingManager";
+export * from "./memory";
  

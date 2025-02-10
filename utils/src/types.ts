@@ -499,6 +499,23 @@ export type Model = {
     };
 };
 
+
+
+
+/**
+ * Provider for external data/services
+ */
+export interface Provider {
+    /** Data retrieval function */
+    get: (
+        runtime: any,
+        message: Memory,
+        state?: State,
+    ) => Promise<any>;
+}
+
+export type TemplateType = string | ((options: { state: State }) => string);
+
 /**
  * Available verifiable inference providers
  */
@@ -587,3 +604,169 @@ export enum TokenizerType {
     TikToken = "tiktoken",
 }
  
+
+/**
+ * Plugin for extending agent functionality
+ */
+export type Plugin = {
+    /** Plugin name */
+    name: string;
+
+    /** Plugin description */
+    description: string;
+
+    /** Optional actions */
+    actions?: Action[];
+
+    /** Optional providers */
+    providers?: Provider[];
+
+    /** Optional evaluators */
+    evaluators?: Evaluator[];
+
+    /** Optional services */
+    services?: Service[];
+
+    /** Optional clients */
+    clients?: Client[];
+};
+
+
+/**
+ * Example for evaluating agent behavior
+ */
+export interface EvaluationExample {
+    /** Evaluation context */
+    context: string;
+
+    /** Example messages */
+    messages: Array<ActionExample>;
+
+    /** Expected outcome */
+    outcome: string;
+}
+
+/**
+ * Evaluator for assessing agent responses
+ */
+export interface Evaluator {
+    /** Whether to always run */
+    alwaysRun?: boolean;
+
+    /** Detailed description */
+    description: string;
+
+    /** Similar evaluator descriptions */
+    similes: string[];
+
+    /** Example evaluations */
+    examples: EvaluationExample[];
+
+    /** Handler function */
+    handler: Handler;
+
+    /** Evaluator name */
+    name: string;
+
+    /** Validation function */
+    validate: Validator;
+}
+
+
+export enum ServiceType {
+    IMAGE_DESCRIPTION = "image_description",
+    TRANSCRIPTION = "transcription",
+    VIDEO = "video",
+    TEXT_GENERATION = "text_generation",
+    BROWSER = "browser",
+    SPEECH_GENERATION = "speech_generation",
+    PDF = "pdf",
+    INTIFACE = "intiface",
+    AWS_S3 = "aws_s3",
+    BUTTPLUG = "buttplug",
+    SLACK = "slack",
+    VERIFIABLE_LOGGING = "verifiable_logging",
+    IRYS = "irys",
+    TEE_LOG = "tee_log",
+    GOPLUS_SECURITY = "goplus_security",
+    WEB_SEARCH = "web_search",
+    EMAIL_AUTOMATION = "email_automation",
+}
+
+
+export abstract class Service {
+    private static instance: Service | null = null;
+
+    static get serviceType(): ServiceType {
+        throw new Error("Service must implement static serviceType getter");
+    }
+
+    public static getInstance<T extends Service>(): T {
+        if (!Service.instance) {
+            Service.instance = new (this as any)();
+        }
+        return Service.instance as T;
+    }
+
+    get serviceType(): ServiceType {
+        return (this.constructor as typeof Service).serviceType;
+    }
+
+    // Add abstract initialize method that must be implemented by derived classes
+    abstract initialize(runtime: any): Promise<void>;
+}
+
+/**
+ * Client interface for platform connections
+ */
+export type Client = {
+    /** Start client connection */
+    start: (runtime: any) => Promise<unknown>;
+
+    /** Stop client connection */
+    stop: (runtime: any) => Promise<unknown>;
+};
+
+
+export interface IMemoryManager {
+    runtime: any;
+    tableName: string;
+    constructor: Function;
+
+    addEmbeddingToMemory(memory: Memory): Promise<Memory>;
+
+    getMemories(opts: {
+        roomId: UUID;
+        count?: number;
+        unique?: boolean;
+        start?: number;
+        end?: number;
+    }): Promise<Memory[]>;
+
+    getCachedEmbeddings(
+        content: string,
+    ): Promise<{ embedding: number[]; levenshtein_score: number }[]>;
+
+    getMemoryById(id: UUID): Promise<Memory | null>;
+    getMemoriesByRoomIds(params: {
+        roomIds: UUID[];
+        limit?: number;
+    }): Promise<Memory[]>;
+    searchMemoriesByEmbedding(
+        embedding: number[],
+        opts: {
+            match_threshold?: number;
+            count?: number;
+            roomId: UUID;
+            unique?: boolean;
+        },
+    ): Promise<Memory[]>;
+
+    createMemory(memory: Memory, unique?: boolean): Promise<void>;
+
+    removeMemory(memoryId: UUID): Promise<void>;
+
+    removeAllMemories(roomId: UUID): Promise<void>;
+
+    countMemories(roomId: UUID, unique?: boolean): Promise<number>;
+}

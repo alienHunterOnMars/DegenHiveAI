@@ -29,7 +29,10 @@
         "@ai-sdk/openai": "^1.1.9",
         "@huggingface/transformers": "^3.3.3",
         "ai": "^4.1.25",
+        "fastembed": "^1.14.1",
+        "handlebars": "^4.7.8",
         "js-tiktoken": "^1.0.18",
-        "together-ai": "^0.13.0"
+        "together-ai": "^0.13.0",
+        "unique-names-generator": "^4.7.1"
     }
 }

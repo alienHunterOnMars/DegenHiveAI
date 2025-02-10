@@ -24,7 +24,8 @@
     },
      "workspaces": [
         "core",
-        "adapters/*"
+        "adapters/*",
+        "plugins/trustdb/*"
       ],
     "dependencies": {
         "@hiveai/adapters-discord": "workspace:*",

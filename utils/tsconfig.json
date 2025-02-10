@@ -24,7 +24,11 @@
         "src/logger.ts",
         "src/models.ts",
         "src/settings.ts",
-        "src/generation.ts"
+        "src/generation.ts",
+        "src/context.ts",
+        "src/embedding.ts",
+        "src/localembeddingManager.ts",
+        "src/memory.ts"
     ],
     "include": ["src/**/*.ts"],
     "exclude": ["node_modules", "dist"]
