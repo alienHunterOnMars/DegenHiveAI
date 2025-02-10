@@ -125,7 +125,7 @@ export class TrustScoreManager {
         const suspiciousVolume = await this.suspiciousVolume(tokenAddress);
         const balance = await this.getRecommenederBalance(recommenderWallet);
         const virtualConfidence = balance / 1000000; // TODO: create formula to calculate virtual confidence based on user balance
-        const lastActive = recommenderMetrics.lastActiveDate;
+        const lastActive = recommenderMetrics?.lastActiveDate || new Date();
         const now = new Date();
         const inactiveDays = Math.floor(
             (now.getTime() - lastActive.getTime()) / (1000 * 60 * 60 * 24)
@@ -134,7 +134,7 @@ export class TrustScoreManager {
             this.DECAY_RATE,
             Math.min(inactiveDays, this.MAX_DECAY_DAYS)
         );
-        const decayedScore = recommenderMetrics.trustScore * decayFactor;
+        const decayedScore = (recommenderMetrics?.trustScore || 0) * decayFactor;
         const validationTrustScore =
             this.trustScoreDb.calculateValidationTrust(tokenAddress);
 
@@ -147,12 +147,12 @@ export class TrustScoreManager {
                     processedData.tradeData.price_change_24h_percent,
                 volumeChange24h: processedData.tradeData.volume_24h,
                 trade_24h_change:
-                    processedData.tradeData.trade_24h_change_percent,
+                    processedData.tradeData.trade_24h_change_percent || 0,
                 liquidity:
                     processedData.dexScreenerData.pairs[0]?.liquidity.usd || 0,
                 liquidityChange24h: 0,
                 holderChange24h:
-                    processedData.tradeData.unique_wallet_24h_change_percent,
+                    processedData.tradeData.unique_wallet_24h_change_percent || 0,
                 rugPull: false,
                 isScam: processedData.tokenCodex.isScam,
                 marketCapChange24h: 0,
@@ -168,12 +168,12 @@ export class TrustScoreManager {
             },
             recommenderMetrics: {
                 recommenderId: recommenderId,
-                trustScore: recommenderMetrics.trustScore,
-                totalRecommendations: recommenderMetrics.totalRecommendations,
-                successfulRecs: recommenderMetrics.successfulRecs,
-                avgTokenPerformance: recommenderMetrics.avgTokenPerformance,
-                riskScore: recommenderMetrics.riskScore,
-                consistencyScore: recommenderMetrics.consistencyScore,
+                trustScore: recommenderMetrics?.trustScore || 0,
+                totalRecommendations: recommenderMetrics?.totalRecommendations || 0,
+                successfulRecs: recommenderMetrics?.successfulRecs || 0,
+                avgTokenPerformance: recommenderMetrics?.avgTokenPerformance || 0,
+                riskScore: recommenderMetrics?.riskScore || 0,
+                consistencyScore: recommenderMetrics?.consistencyScore || 0,
                 virtualConfidence: virtualConfidence,
                 lastActiveDate: now,
                 trustDecay: decayedScore,
@@ -190,20 +190,25 @@ export class TrustScoreManager {
         const recommenderMetrics =
             await this.trustScoreDb.getRecommenderMetrics(recommenderId);
 
+        if (!recommenderMetrics) {
+            Logger.error(`Recommender metrics not found for ${recommenderId}`);
+            return;
+        }
+
         const totalRecommendations =
-            recommenderMetrics.totalRecommendations + 1;
+            (recommenderMetrics?.totalRecommendations || 0) + 1;
         const successfulRecs = tokenPerformance.rugPull
-            ? recommenderMetrics.successfulRecs
-            : recommenderMetrics.successfulRecs + 1;
+            ? recommenderMetrics?.successfulRecs || 0
+            : (recommenderMetrics?.successfulRecs || 0) + 1;
         const avgTokenPerformance =
-            (recommenderMetrics.avgTokenPerformance *
-                recommenderMetrics.totalRecommendations +
+            (recommenderMetrics?.avgTokenPerformance || 0 *
+                (   recommenderMetrics?.totalRecommendations || 0) +
                 tokenPerformance.priceChange24h) /
-            totalRecommendations;
+            (recommenderMetrics?.totalRecommendations || 0);
 
         const overallTrustScore = this.calculateTrustScore(
             tokenPerformance,
-            recommenderMetrics
+            recommenderMetrics  
         );
         const riskScore = this.calculateOverallRiskScore(
             tokenPerformance,
@@ -382,7 +387,7 @@ export class TrustScoreManager {
 
         const creationData = {
             token_address: tokenAddress,
-            recommender_id: recommender.id,
+            recommender_id: recommender?.id || "",
             buy_price: processedData.tradeData.price,
             sell_price: 0,
             buy_timeStamp: new Date().toISOString(),
@@ -427,12 +432,12 @@ export class TrustScoreManager {
             symbol: processedData.tokenCodex.symbol,
             priceChange24h: processedData.tradeData.price_change_24h_percent,
             volumeChange24h: processedData.tradeData.volume_24h,
-            trade_24h_change: processedData.tradeData.trade_24h_change_percent,
+            trade_24h_change: processedData.tradeData.trade_24h_change_percent || 0,
             liquidity:
                 processedData.dexScreenerData.pairs[0]?.liquidity.usd || 0,
             liquidityChange24h: 0,
             holderChange24h:
-                processedData.tradeData.unique_wallet_24h_change_percent,
+                processedData.tradeData.unique_wallet_24h_change_percent || 0,
             rugPull: false,
             isScam: tokenCodex.isScam,
             marketCapChange24h: 0,
@@ -551,20 +556,20 @@ export class TrustScoreManager {
             sellDetails.sell_amount * processedData.tradeData.price;
         const trade = await this.trustScoreDb.getLatestTradePerformance(
             tokenAddress,
-            recommender.id,
+            recommender?.id || "",
             isSimulation
         );
-        const buyTimeStamp = trade.buy_timeStamp;
+        const buyTimeStamp = trade?.buy_timeStamp || "";
         const marketCap =
             processedData.dexScreenerData.pairs[0]?.marketCap || 0;
         const liquidity =
             processedData.dexScreenerData.pairs[0]?.liquidity.usd || 0;
         const sell_price = processedData.tradeData.price;
-        const profit_usd = sell_value_usd - trade.buy_value_usd;
-        const profit_percent = (profit_usd / trade.buy_value_usd) * 100;
+        const profit_usd = sell_value_usd - (trade?.buy_value_usd || 0);
+        const profit_percent = (profit_usd / (trade?.buy_value_usd || 0)) * 100;
 
-        const market_cap_change = marketCap - trade.buy_market_cap;
-        const liquidity_change = liquidity - trade.buy_liquidity;
+        const market_cap_change = marketCap - (trade?.buy_market_cap || 0);
+        const liquidity_change = liquidity - (trade?.buy_liquidity || 0);
 
         const isRapidDump = await this.isRapidDump(tokenAddress);
 
@@ -585,7 +590,7 @@ export class TrustScoreManager {
         };
         this.trustScoreDb.updateTradePerformanceOnSell(
             tokenAddress,
-            recommender.id,
+            recommender?.id || "",
             buyTimeStamp,
             sellDetailsData,
             isSimulation
@@ -649,11 +654,18 @@ export class TrustScoreManager {
                         this.trustScoreDb.getTokenPerformance(
                             recommendation.tokenAddress
                         );
+                    if (!tokenPerformance) {
+                        Logger.error(`Token performance not found for ${recommendation.tokenAddress}`);
+                        return;
+                    }
                     const recommenderMetrics =
                         this.trustScoreDb.getRecommenderMetrics(
                             recommendation.recommenderId
                         );
-
+                    if (!recommenderMetrics) {
+                        Logger.error(`Recommender metrics not found for ${recommendation.recommenderId}`);
+                        return;
+                    }
                     const trustScore = this.calculateTrustScore(
                         tokenPerformance,
                         recommenderMetrics

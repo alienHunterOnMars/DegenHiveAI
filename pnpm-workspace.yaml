@@ -1,7 +1,8 @@
 packages:
   - 'adapters/*'
   - 'services/*'
-  - 'plugins/trustdb/*'
+  - 'plugins/trustdb'
+  - 'plugins/solana'
   - 'core'
   - 'utils'
   - 'messaging' 
