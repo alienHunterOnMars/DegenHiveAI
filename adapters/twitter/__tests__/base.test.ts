@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ClientBase } from '../src/base';
-import type { IAgentRuntime } from '@elizaos/core';
+import type { IAgentRuntime } from '@hiveai/utils';
 import type { TwitterConfig } from '../src/environment';
 
 describe('Twitter Client Base', () => {

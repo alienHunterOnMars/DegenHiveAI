@@ -7,7 +7,7 @@ import type {
 import { Connection, PublicKey } from "@solana/web3.js";
 // Assuming TokenProvider and IAgentRuntime are available
 import { TokenProvider } from "./token.ts";
-// import { settings } from "@elizaos/core";
+// import { settings } from "@hiveai/utils";
 import {  Logger } from "@hiveai/utils";
 import { WalletProvider } from "./wallet.ts";
 import * as amqp from "amqplib";
