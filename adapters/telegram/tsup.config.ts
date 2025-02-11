@@ -2,6 +2,7 @@ import { defineConfig } from 'tsup';
 
 export default defineConfig({
     entry: ['src/index.ts'],
+    outDir: 'dist',
     format: ['esm'],
     dts: {
         compilerOptions: {
@@ -10,7 +11,7 @@ export default defineConfig({
             tsBuildInfoFile: undefined
         }
     },
-    clean: true,
     sourcemap: true,
+    clean: true,
     external: ['@hiveai/utils', '@hiveai/messaging']
 }); 

@@ -3,8 +3,15 @@
     "compilerOptions": {
         "outDir": "./dist",
         "rootDir": "./src",
-        "incremental": false,
-        "composite": false
+        "composite": true,
+        "declaration": true,
+        "paths": {
+            "@hiveai/*": ["../../*/src"]
+        }
     },
-    "include": ["src/**/*"]
+    "include": ["src/**/*"],
+    "exclude": ["**/*.test.ts", "node_modules", "dist"],
+    "references": [
+        { "path": "../../utils" },
+    ]
 } 

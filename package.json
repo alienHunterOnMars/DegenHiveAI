@@ -4,7 +4,7 @@
     "private": true,
     "type": "module",
     "scripts": {
-        "build": "npm run build:utils && npm run build:messaging && npm run build:plugins && tsc",
+        "build": "npm run build:utils && npm run build:messaging && npm run build:adapters && npm run build:plugins && tsc",
         "build:utils": "cd utils && npm run build",
         "build:messaging": "cd messaging && tsc -b",
         "build:adapters": "npm run build:discord && npm run build:farcaster && npm run build:reddit && npm run build:telegram && npm run build:twitter && npm run build:email",

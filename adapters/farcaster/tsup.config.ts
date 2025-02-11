@@ -3,9 +3,16 @@ import { defineConfig } from "tsup";
 export default defineConfig({
     entry: ["src/index.ts"],
     outDir: "dist",
+    format: ["esm"], // Ensure you're targeting CommonJS
+    dts: {
+        compilerOptions: {
+            composite: false,
+            incremental: false,
+            tsBuildInfoFile: undefined
+        }
+    },    
     sourcemap: true,
     clean: true,
-    format: ["esm"], // Ensure you're targeting CommonJS
     external: [
         "dotenv", // Externalize dotenv to prevent bundling
         "fs", // Externalize fs to use Node.js built-in module

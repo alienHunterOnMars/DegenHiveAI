@@ -12,7 +12,7 @@
  * can be implemented as plugins and registered via the PLUGINS environment variable.
  */
 
-//  && npm run build:adapters
+//  
 
 import { Logger } from '@hiveai/utils';
 // import { KafkaEventBus } from './infrastructure/KafkaEventBus';
@@ -20,12 +20,12 @@ import { Logger } from '@hiveai/utils';
 // import { ServiceRegistry } from './infrastructure/ServiceRegistry';
 // import { AgentOrchestrator } from './services/agent-orchestrator/AgentOrchestrator';
 // import { MessageOrchestrator } from './services/message-orchestrator/MessageOrchestrator';
-// import { DiscordAdapter } from "@hiveai/adapters-discord";
-// import { TelegramAdapter } from '@hiveai/adapters-telegram';
-// import { RedditAdapter } from '@hiveai/adapters-reddit';
-// import { TwitterAdapter } from '@hiveai/adapters-twitter';
-// import { FarcasterAdapter } from '@hiveai/adapters-farcaster';
-// import { EmailAdapter } from '@hiveai/adapters-email';
+import { DiscordAdapter } from "@hiveai/adapters-discord";
+import { TelegramAdapter } from '@hiveai/adapters-telegram';
+import { RedditAdapter } from '@hiveai/adapters-reddit';
+import { TwitterAdapter } from '@hiveai/adapters-twitter';
+import { FarcasterAdapter } from '@hiveai/adapters-farcaster';
+import { EmailAdapter } from '@hiveai/adapters-email';
 import dotenv from 'dotenv';
 import { loadConfig } from './utils/config';
 import * as fs from 'fs';

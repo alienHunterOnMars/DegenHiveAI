@@ -35,7 +35,9 @@
         "typescript": "^5.0.0"
     },
     "scripts": {
-        "build": "tsup",
-        "dev": "tsup --watch"
+		"build": "tsup",
+		"dev": "tsup --watch",
+		"test": "vitest run",
+		"test:coverage": "vitest run --coverage"
     }
 }

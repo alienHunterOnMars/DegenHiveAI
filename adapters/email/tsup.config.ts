@@ -6,6 +6,12 @@ export default defineConfig({
     sourcemap: true,
     clean: true,
     format: ["esm"], // Ensure you're targeting CommonJS
-    external: ["nodemailer", "mail-notifier", "z"],
-    dts: true,
+    external: ['@hiveai/utils', "nodemailer", "mail-notifier", "z"],
+    dts: {
+        compilerOptions: {
+            composite: false,
+            incremental: false,
+            tsBuildInfoFile: undefined
+        }
+    },
 });
