@@ -4,7 +4,7 @@
     "private": true,
     "type": "module",
     "scripts": {
-        "build": "npm run build:deps && tsc -b && npm run copy-utils",
+        "build": "npm run build:deps && tsc -b",
         "build:deps": "npm run build:utils && npm run build:messaging && npm run build:adapters && npm run build:plugins",
         "build:utils": "cd utils && npm run build",
         "build:messaging": "cd messaging && tsc -b",
@@ -22,7 +22,6 @@
         "build:trustdb": "cd plugins/trustdb && npm run build",
         "start": "node --experimental-modules --es-module-specifier-resolution=node dist/start_hive_swarm.js",
         "dev": "ts-node src/start_hive_swarm.ts",
-        "copy-utils": "cp -r src/utils dist/",
         "clean": "rm -rf dist && npm run clean:adapters && npm run clean:plugins",
         "clean:adapters": "cd adapters && for d in */; do rm -rf \"$d/dist\"; done",
         "clean:plugins": "cd plugins && for d in */; do rm -rf \"$d/dist\"; done"

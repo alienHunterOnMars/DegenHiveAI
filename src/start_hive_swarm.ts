@@ -12,8 +12,10 @@
  * can be implemented as plugins and registered via the PLUGINS environment variable.
  */
 
-//  
-
+import { fileURLToPath } from 'node:url';
+import { dirname, resolve } from 'node:path';
+import * as fs from 'node:fs';
+import * as dotenv from 'dotenv';
 import { Logger } from '@hiveai/utils';
 // import { KafkaEventBus } from './infrastructure/KafkaEventBus';
 // import { RedisClient } from './infrastructure/RedisClient';
@@ -26,17 +28,21 @@ import { RedditAdapter } from '@hiveai/adapters-reddit';
 import { TwitterAdapter } from '@hiveai/adapters-twitter';
 import { FarcasterAdapter } from '@hiveai/adapters-farcaster';
 import { EmailAdapter } from '@hiveai/adapters-email';
-import dotenv from 'dotenv';
-import { loadConfig } from './utils/config';
-import * as fs from 'fs';
 import { solanaPlugin } from '@hiveai/plugin-solana';
 import { suiPlugin } from '@hiveai/plugin-sui';
 // import { hyperliquidPlugin } from '@hiveai/plugin-hyperliquid';
 import { trustDBPlugin } from '@hiveai/plugin-trustdb';
 
-dotenv.config();
+// Initialize dotenv with explicit path resolution
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const envPath = resolve(__dirname, '../.env');
 
-// Add this at the very top of the file, after imports
+if (fs.existsSync(envPath)) {
+    dotenv.config({ path: envPath });
+}
+
+// Now we can use Logger after it's imported
 console.log('Raw console.log test');
 Logger.info('Logger test');
 
@@ -127,8 +133,18 @@ class HiveSwarm {
 
     constructor() {
         // Load configuration
-        this.config = loadConfig();
-        
+        this.config = {};
+        try {
+            const configPath = process.env.CONFIG_PATH || './config.json';
+            if (!fs.existsSync(configPath)) {
+                Logger.warn(`Config file not found at ${configPath}, using defaults`);
+            }
+            const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+            this.config = config;
+        } catch (error) {
+            Logger.error('Error loading config:', error);
+        }
+
         // Initialize infrastructure
         this.adapters = new Map();
         // this.eventBus = new KafkaEventBus(this.config.infrastructure.kafka);
