@@ -1,112 +1,175 @@
-import { Etcd3 } from 'etcd3';
-import { Logger } from '@hiveai/utils';
+// import { Logger } from '@hiveai/utils';
+// import { RedisClient } from './RedisClient';
 
-interface ServiceInfo {
-    id: string;
-    name: string;
-    host: string;
-    port: number;
-    status: 'healthy' | 'unhealthy';
-    lastHeartbeat: number;
-    metadata: Record<string, any>;
-}
+// interface ServiceInfo {
+//     id: string;
+//     name: string;
+//     host: string;
+//     port: number;
+//     status: 'healthy' | 'unhealthy' | 'starting';
+//     metadata?: Record<string, any>;
+//     lastHeartbeat?: number;
+// }
 
-export class ServiceRegistry {
-    private client: Etcd3;
-    private readonly namespace = '/hive-swarm/services/';
-    private services: Map<string, ServiceInfo>;
-    private heartbeatInterval?: NodeJS.Timeout;
+// export class ServiceRegistry {
+//     private heartbeatInterval?: NodeJS.Timeout;
+//     private readonly servicePrefix = 'service:';
+//     private readonly ttl = 60; // seconds
 
-    constructor() {
-        this.client = new Etcd3({
-            hosts: process.env.ETCD_HOSTS?.split(',') || ['localhost:2379']
-        });
-        this.services = new Map();
-    }
+//     constructor(
+//         private redis: RedisClient,
+//         private heartbeatFrequency: number = 30000 // 30 seconds
+//     ) {}
 
-    async start(): Promise<void> {
-        try {
-            // Start watching for service changes
-            const watcher = await this.client.watch()
-                .prefix(this.namespace)
-                .create();
-                
-            watcher
-                .on('put', async (res) => {
-                    const serviceInfo: ServiceInfo = JSON.parse(res.value.toString());
-                    this.services.set(serviceInfo.id, serviceInfo);
-                    Logger.info(`Service registered: ${serviceInfo.name} (${serviceInfo.id})`);
-                })
-                .on('delete', async (res) => {
-                    const serviceId = res.key.toString().replace(this.namespace, '');
-                    this.services.delete(serviceId);
-                    Logger.info(`Service deregistered: ${serviceId}`);
-                });
+//     async connect(): Promise<void> {
+//         try {
+//             // Start heartbeat
+//             this.startHeartbeat();
+//             Logger.info('ServiceRegistry: Connected');
+//         } catch (error) {
+//             Logger.error('ServiceRegistry: Connection failed:', error);
+//             throw error;
+//         }
+//     }
 
-            // Start heartbeat
-            this.startHeartbeat();
-            Logger.info('ServiceRegistry: Started successfully');
-        } catch (error) {
-            Logger.error('ServiceRegistry: Failed to start:', error);
-            throw error;
-        }
-    }
+//     async register(service: ServiceInfo): Promise<void> {
+//         try {
+//             const key = `${this.servicePrefix}${service.name}:${service.id}`;
+//             const data = {
+//                 ...service,
+//                 lastHeartbeat: Date.now()
+//             };
 
-    async register(service: Omit<ServiceInfo, 'lastHeartbeat'>): Promise<void> {
-        try {
-            const serviceInfo: ServiceInfo = {
-                ...service,
-                lastHeartbeat: Date.now()
-            };
+//             await this.redis.setEx(key, this.ttl, JSON.stringify(data));
+//             Logger.info(`ServiceRegistry: Registered ${service.name}:${service.id}`);
+//         } catch (error) {
+//             Logger.error('ServiceRegistry: Registration failed:', error);
+//             throw error;
+//         }
+//     }
 
-            await this.client.put(
-                `${this.namespace}${service.id}`
-            ).value(JSON.stringify(serviceInfo));
+//     async unregister(serviceName: string, serviceId: string): Promise<void> {
+//         try {
+//             const key = `${this.servicePrefix}${serviceName}:${serviceId}`;
+//             await this.redis.del(key);
+//             Logger.info(`ServiceRegistry: Unregistered ${serviceName}:${serviceId}`);
+//         } catch (error) {
+//             Logger.error('ServiceRegistry: Unregistration failed:', error);
+//             throw error;
+//         }
+//     }
 
-            this.services.set(service.id, serviceInfo);
-            Logger.info(`ServiceRegistry: Registered ${service.name}`);
-        } catch (error) {
-            Logger.error(`ServiceRegistry: Failed to register ${service.name}:`, error);
-            throw error;
-        }
-    }
+//     async getService(serviceName: string, serviceId: string): Promise<ServiceInfo | null> {
+//         try {
+//             const key = `${this.servicePrefix}${serviceName}:${serviceId}`;
+//             const data = await this.redis.get(key);
+//             return data ? JSON.parse(data) : null;
+//         } catch (error) {
+//             Logger.error('ServiceRegistry: Get service failed:', error);
+//             throw error;
+//         }
+//     }
 
-    private startHeartbeat(): void {
-        this.heartbeatInterval = setInterval(async () => {
-            for (const [id, service] of this.services) {
-                try {
-                    await this.updateHeartbeat(id);
-                } catch (error) {
-                    Logger.error(`ServiceRegistry: Heartbeat failed for ${service.name}:`, error);
-                }
-            }
-        }, 30000); // 30 second interval
-    }
+//     async getServiceInstances(serviceName: string): Promise<ServiceInfo[]> {
+//         try {
+//             const pattern = `${this.servicePrefix}${serviceName}:*`;
+//             const keys = await this.redis.keys(pattern);
+//             const services: ServiceInfo[] = [];
 
-    private async updateHeartbeat(serviceId: string): Promise<void> {
-        const service = this.services.get(serviceId);
-        if (!service) return;
+//             for (const key of keys) {
+//                 const data = await this.redis.get(key);
+//                 if (data) {
+//                     services.push(JSON.parse(data));
+//                 }
+//             }
 
-        service.lastHeartbeat = Date.now();
-        await this.client.put(
-            `${this.namespace}${serviceId}`
-        ).value(JSON.stringify(service));
-    }
+//             return services;
+//         } catch (error) {
+//             Logger.error('ServiceRegistry: Get instances failed:', error);
+//             throw error;
+//         }
+//     }
 
-    async getService(serviceId: string): Promise<ServiceInfo | undefined> {
-        return this.services.get(serviceId);
-    }
+//     async getHealthyInstance(serviceName: string): Promise<ServiceInfo | null> {
+//         try {
+//             const instances = await this.getServiceInstances(serviceName);
+//             return instances.find(service => 
+//                 service.status === 'healthy' && 
+//                 service.lastHeartbeat && 
+//                 Date.now() - service.lastHeartbeat < this.ttl * 1000
+//             ) || null;
+//         } catch (error) {
+//             Logger.error('ServiceRegistry: Get healthy instance failed:', error);
+//             throw error;
+//         }
+//     }
 
-    async getAllServices(): Promise<ServiceInfo[]> {
-        return Array.from(this.services.values());
-    }
+//     private startHeartbeat(): void {
+//         if (this.heartbeatInterval) return;
 
-    async stop(): Promise<void> {
-        if (this.heartbeatInterval) {
-            clearInterval(this.heartbeatInterval);
-        }
-        await this.client.delete().prefix(this.namespace);
-        await this.client.close();
-        Logger.info('ServiceRegistry: Stopped');
-    }
-} 
+//         const interval = setInterval(async () => {
+//             try {
+//                 // Update TTL for all services
+//                 const pattern = `${this.servicePrefix}*`;
+//                 const keys = await this.redis.keys(pattern);
+
+//                 for (const key of keys) {
+//                     const data = await this.redis.get(key);
+//                     if (data) {
+//                         const service = JSON.parse(data);
+//                         await this.register(service);
+//                     }
+//                 }
+//             } catch (error) {
+//                 Logger.error('ServiceRegistry: Heartbeat failed:', error);
+//             }
+//         }, this.heartbeatFrequency);
+
+//         this.heartbeatInterval = interval;
+//     }
+
+//     async disconnect(): Promise<void> {
+//         if (this.heartbeatInterval) {
+//             clearInterval(this.heartbeatInterval);
+//             this.heartbeatInterval = undefined;
+//         }
+//         Logger.info('ServiceRegistry: Disconnected');
+//     }
+
+//     // Helper method to check service health
+//     async checkServiceHealth(serviceName: string, serviceId: string): Promise<boolean> {
+//         const service = await this.getService(serviceName, serviceId);
+//         if (!service) return false;
+
+//         return (
+//             service.status === 'healthy' &&
+//             service.lastHeartbeat &&
+//             Date.now() - service.lastHeartbeat < this.ttl * 1000
+//         );
+//     }
+
+//     // Get all registered services
+//     async getAllServices(): Promise<Record<string, ServiceInfo[]>> {
+//         try {
+//             const pattern = `${this.servicePrefix}*`;
+//             const keys = await this.redis.keys(pattern);
+//             const services: Record<string, ServiceInfo[]> = {};
+
+//             for (const key of keys) {
+//                 const data = await this.redis.get(key);
+//                 if (data) {
+//                     const service = JSON.parse(data);
+//                     if (!services[service.name]) {
+//                         services[service.name] = [];
+//                     }
+//                     services[service.name].push(service);
+//                 }
+//             }
+
+//             return services;
+//         } catch (error) {
+//             Logger.error('ServiceRegistry: Get all services failed:', error);
+//             throw error;
+//         }
+//     }
+// } 
