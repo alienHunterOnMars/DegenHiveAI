@@ -16,10 +16,7 @@
         { "path": "../../utils" }
     ],
     "files": [
-        "src/index.ts",
-        "src/trustScoreDatabase.ts"
+        "src/index.ts"
     ],
-    "include": [
-        "./src/**/*.ts"
-    ]
+    "include": ["src/**/*"]
 } 

@@ -15,6 +15,7 @@
       "forceConsistentCasingInFileNames": true,
       "baseUrl": ".",
       "paths": {
+        "@hiveai/plugin-*": ["plugins/*/src"],
         "@hiveai/*": ["*/src"]
       },
       "composite": true,
