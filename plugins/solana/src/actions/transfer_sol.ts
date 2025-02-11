@@ -10,7 +10,6 @@ import {
     type ActionExample,
     type Content,
     type HandlerCallback,
-    type IAgentRuntime,
     type Memory,
     ModelClass,
     type State,
@@ -54,14 +53,14 @@ Extract the following information about the requested SOL transfer:
 export default {
     name: "SEND_SOL",
     similes: ["TRANSFER_SOL", "PAY_SOL", "TRANSACT_SOL"],
-    validate: async (runtime: IAgentRuntime, message: Memory) => {
+    validate: async (runtime: any, message: Memory) => {
         // Always return true for SOL transfers, letting the handler deal with specifics
         Logger.log("Validating SOL transfer from user:", message.userId);
         return true;
     },
     description: "Transfer native SOL from agent's wallet to specified address",
     handler: async (
-        runtime: IAgentRuntime,
+        runtime: any,
         message: Memory,
         state: State,
         _options: { [key: string]: unknown },
@@ -103,14 +102,18 @@ export default {
 
             const lamports = content.amount * 1e9;
 
+            if (!senderKeypair?.publicKey) {
+                throw new Error("No sender keypair found");
+            }
+
             const instruction = SystemProgram.transfer({
-                fromPubkey: senderKeypair.publicKey,
+                fromPubkey: senderKeypair?.publicKey,
                 toPubkey: recipientPubkey,
                 lamports,
             });
 
             const messageV0 = new TransactionMessage({
-                payerKey: senderKeypair.publicKey,
+                payerKey: senderKeypair?.publicKey,
                 recentBlockhash: (await connection.getLatestBlockhash()).blockhash,
                 instructions: [instruction],
             }).compileToV0Message();
@@ -133,7 +136,7 @@ export default {
             }
 
             return true;
-        } catch (error) {
+        } catch (error: any) {
             Logger.error("Error during SOL transfer:", error);
             if (callback) {
                 callback({

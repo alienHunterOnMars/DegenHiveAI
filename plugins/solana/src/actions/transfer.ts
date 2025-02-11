@@ -117,7 +117,11 @@ export default {
             const decimals = (mintInfo.value?.data as any)?.parsed?.info?.decimals ?? 9;
             const adjustedAmount = BigInt(Number(content.amount) * Math.pow(10, decimals));
 
-            const senderATA = getAssociatedTokenAddressSync(mintPubkey, senderKeypair.publicKey);
+            if (!senderKeypair?.publicKey) {
+                throw new Error("No sender keypair found");
+            }
+
+            const senderATA = getAssociatedTokenAddressSync(mintPubkey, senderKeypair?.publicKey);
             const recipientATA = getAssociatedTokenAddressSync(mintPubkey, recipientPubkey);
 
             const instructions = [];
@@ -127,7 +131,7 @@ export default {
                 const { createAssociatedTokenAccountInstruction } = await import("@solana/spl-token");
                 instructions.push(
                     createAssociatedTokenAccountInstruction(
-                        senderKeypair.publicKey,
+                        senderKeypair?.publicKey,
                         recipientATA,
                         recipientPubkey,
                         mintPubkey
@@ -139,7 +143,7 @@ export default {
                 createTransferInstruction(
                     senderATA,
                     recipientATA,
-                    senderKeypair.publicKey,
+                    senderKeypair?.publicKey,
                     adjustedAmount
                 )
             );
@@ -168,7 +172,7 @@ export default {
             }
 
             return true;
-        } catch (error) {
+        } catch (error: any) {
             Logger.error("Error during token transfer:", error);
             if (callback) {
                 callback({

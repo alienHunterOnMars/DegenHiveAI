@@ -5,8 +5,8 @@ import {
     Logger,
 } from "@hiveai/utils";
 import { Connection, type Keypair, PublicKey, Transaction } from "@solana/web3.js";
-import { getQuote } from "./swapUtils.ts";
-import { getWalletKey } from "../keypairUtils.ts";
+import { getQuote } from "./swapUtils";
+import { getWalletKey } from "../keypairUtils";
 
 async function invokeSwapDao(
     connection: Connection,
@@ -72,14 +72,18 @@ export const executeSwapForDAO: Action = {
 
             const daoMint = new PublicKey(runtime.getSetting("DAO_MINT")); // DAO mint address
 
+            if (!authority) {
+                throw new Error("No DAO mint found");
+            }
+
             // Derive PDAs
             const [statePDA] = await PublicKey.findProgramAddress(
                 [Buffer.from("state"), daoMint.toBuffer()],
-                authority.publicKey
+                authority?.publicKey
             );
             const [walletPDA] = await PublicKey.findProgramAddress(
                 [Buffer.from("wallet"), daoMint.toBuffer()],
-                authority.publicKey
+                authority?.publicKey
             );
 
             const quoteData = await getQuote(
@@ -100,10 +104,14 @@ export const executeSwapForDAO: Action = {
             const instructionData = Buffer.from(
                 JSON.stringify({
                     quote: quoteData.data,
-                    userPublicKey: authority.publicKey.toString(),
+                    userPublicKey: authority?.publicKey?.toString(),
                     wrapAndUnwrapSol: true,
                 })
             );
+
+            if (!authority) {
+                throw new Error("No authority found");
+            }
 
             const txid = await invokeSwapDao(
                 connection,

@@ -3,7 +3,6 @@ import {
     composeContext,
     generateObjectDeprecated,
     type HandlerCallback,
-    type IAgentRuntime,
     type Memory,
     ModelClass,
     settings,
@@ -13,9 +12,9 @@ import {
 } from "@hiveai/utils";
 import { Connection, type PublicKey, VersionedTransaction } from "@solana/web3.js";
 import BigNumber from "bignumber.js";
-import { getWalletKey } from "../keypairUtils.ts";
-import { walletProvider, WalletProvider } from "../providers/wallet.ts";
-import { getTokenDecimals } from "./swapUtils.ts";
+import { getWalletKey } from "../keypairUtils";
+import { walletProvider, WalletProvider } from "../providers/wallet";
+import { getTokenDecimals } from "./swapUtils";
 
 async function swapToken(
     connection: Connection,
@@ -139,8 +138,11 @@ Respond with a JSON markdown block containing only the extracted values. Use nul
 // if we get the token symbol but not the CA, check walet for matching token, and if we have, get the CA for it
 
 // get all the tokens in the wallet using the wallet provider
-async function getTokensInWallet(runtime: IAgentRuntime) {
+async function getTokensInWallet(runtime: any) {
     const { publicKey } = await getWalletKey(runtime, false);
+    if (!publicKey) {
+        throw new Error("No public key found");
+    }
     const walletProvider = new WalletProvider(
         new Connection("https://api.mainnet-beta.solana.com"),
         publicKey
@@ -152,7 +154,7 @@ async function getTokensInWallet(runtime: IAgentRuntime) {
 }
 
 // check if the token symbol is in the wallet
-async function getTokenFromWallet(runtime: IAgentRuntime, tokenSymbol: string) {
+async function getTokenFromWallet(runtime: any, tokenSymbol: string) {
     try {
         const items = await getTokensInWallet(runtime);
         const token = items.find((item) => item.symbol === tokenSymbol);
@@ -173,14 +175,14 @@ async function getTokenFromWallet(runtime: IAgentRuntime, tokenSymbol: string) {
 export const executeSwap: Action = {
     name: "EXECUTE_SWAP",
     similes: ["SWAP_TOKENS", "TOKEN_SWAP", "TRADE_TOKENS", "EXCHANGE_TOKENS"],
-    validate: async (runtime: IAgentRuntime, message: Memory) => {
+    validate: async (runtime: any, message: Memory) => {
         // Check if the necessary parameters are provided in the message
         Logger.log("Message:", message);
         return true;
     },
     description: "Perform a token swap.",
     handler: async (
-        runtime: IAgentRuntime,
+        runtime: any,
         message: Memory,
         state: State,
         _options: { [key: string]: unknown },
@@ -303,6 +305,10 @@ export const executeSwap: Action = {
             Logger.log("outputTokenSymbol:", response.outputTokenCA);
             Logger.log("amount:", response.amount);
 
+            if (!walletPublicKey) {
+                throw new Error("No wallet public key found");
+            }
+
             const swapResult = await swapToken(
                 connection,
                 walletPublicKey,
@@ -324,7 +330,7 @@ export const executeSwap: Action = {
             Logger.log("Creating keypair...");
             const { keypair } = await getWalletKey(runtime, true);
             // Verify the public key matches what we expect
-            if (keypair.publicKey.toBase58() !== walletPublicKey.toBase58()) {
+            if (keypair?.publicKey?.toBase58() !== walletPublicKey.toBase58()) {
                 throw new Error(
                     "Generated public key doesn't match expected public key"
                 );

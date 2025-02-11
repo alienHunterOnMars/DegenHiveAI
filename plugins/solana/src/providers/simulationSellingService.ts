@@ -6,13 +6,12 @@ import type {
 } from "@hiveAI/plugin-trustdb";
 import { Connection, PublicKey } from "@solana/web3.js";
 // Assuming TokenProvider and IAgentRuntime are available
-import { TokenProvider } from "./token.ts";
+import { TokenProvider } from "./token";
 // import { settings } from "@hiveai/utils";
 import {  Logger } from "@hiveai/utils";
-import { WalletProvider } from "./wallet.ts";
-import * as amqp from "amqplib";
-import type { ProcessedTokenData } from "../types/token.ts";
-import { getWalletKey } from "../keypairUtils.ts";
+import { WalletProvider } from "./wallet";
+import type { ProcessedTokenData } from "../types/token";
+import { getWalletKey } from "../keypairUtils";
 
 interface SellDetails {
     sell_amount: number;
@@ -21,15 +20,13 @@ interface SellDetails {
 
 export class SimulationSellingService {
     private trustScoreDb: TrustScoreDatabase;
-    private walletProvider: WalletProvider;
+    private walletProvider!: WalletProvider;
     private connection: Connection;
     private baseMint: PublicKey;
     private DECAY_RATE = 0.95;
     private MAX_DECAY_DAYS = 30;
     private backend: string;
     private backendToken: string;
-    private amqpConnection: amqp.Connection;
-    private amqpChannel: amqp.Channel;
     private sonarBe: string;
     private sonarBeToken: string;
     private runtime:  any;
@@ -46,47 +43,13 @@ export class SimulationSellingService {
         );
         this.backend = runtime.getSetting("BACKEND_URL");
         this.backendToken = runtime.getSetting("BACKEND_TOKEN");
-        this.initializeRabbitMQ(runtime.getSetting("AMQP_URL"));
         this.sonarBe = runtime.getSetting("SONAR_BE");
         this.sonarBeToken = runtime.getSetting("SONAR_BE_TOKEN");
         this.runtime = runtime;
         this.initializeWalletProvider();
     }
-    /**
-     * Initializes the RabbitMQ connection and starts consuming messages.
-     * @param amqpUrl The RabbitMQ server URL.
-     */
-    private async initializeRabbitMQ(amqpUrl: string) {
-        try {
-            this.amqpConnection = await amqp.connect(amqpUrl);
-            this.amqpChannel = await this.amqpConnection.createChannel();
-            Logger.log("Connected to RabbitMQ");
-            // Start consuming messages
-            this.consumeMessages();
-        } catch (error) {
-            Logger.error("Failed to connect to RabbitMQ:", error);
-        }
-    }
-
-    /**
-     * Sets up the consumer for the specified RabbitMQ queue.
-     */
-    private async consumeMessages() {
-        const queue = "process_eliza_simulation";
-        await this.amqpChannel.assertQueue(queue, { durable: true });
-        this.amqpChannel.consume(
-            queue,
-            (msg) => {
-                if (msg !== null) {
-                    const content = msg.content.toString();
-                    this.processMessage(content);
-                    this.amqpChannel.ack(msg);
-                }
-            },
-            { noAck: false }
-        );
-        Logger.log(`Listening for messages on queue: ${queue}`);
-    }
+ 
+ 
 
     /**
      * Processes incoming messages from RabbitMQ.
@@ -100,9 +63,13 @@ export class SimulationSellingService {
                 `Received message for token ${tokenAddress} to sell ${amount}`
             );
 
+            const tokenPerformance = await this.trustScoreDb.getTokenPerformance(tokenAddress);
+            if (!tokenPerformance) {
+                throw new Error(`Token performance not found for ${tokenAddress}`);
+            }
+
             const decision: SellDecision = {
-                tokenPerformance:
-                    await this.trustScoreDb.getTokenPerformance(tokenAddress),
+                tokenPerformance,
                 amountToSell: amount,
                 sell_recommender_id: sell_recommender_id,
             };
@@ -143,10 +110,11 @@ export class SimulationSellingService {
                 this.runtime.cacheManager
             );
 
+ 
             // Update sell details in the database
             const sellDetailsData = await this.updateSellDetails(
                 tokenAddress,
-                sell_recommender_id,
+                sell_recommender_id || "",
                 sellTimeStamp,
                 sellDetails,
                 true, // isSimulation
@@ -180,7 +148,9 @@ export class SimulationSellingService {
      */
     private async initializeWalletProvider(): Promise<void> {
         const { publicKey } = await getWalletKey(this.runtime, false);
-
+        if (!publicKey) {
+            throw new Error("No public key found");
+        }
         this.walletProvider = new WalletProvider(this.connection, publicKey);
     }
 
@@ -199,7 +169,7 @@ export class SimulationSellingService {
         await this.processTokenPerformances(tokenPerformances);
     }
 
-    private processTokenPerformances(tokenPerformances: TokenPerformance[]) {
+    private async processTokenPerformances(tokenPerformances: TokenPerformance[]) {
         //  To Do: logic when to sell and how much
         Logger.log("Deciding when to sell and how much...");
         const runningProcesses = this.runningProcesses;
@@ -241,7 +211,7 @@ export class SimulationSellingService {
         });
     }
 
-    public processTokenPerformance(
+    public async processTokenPerformance(
         tokenAddress: string,
         recommenderId: string
     ) {
@@ -257,20 +227,14 @@ export class SimulationSellingService {
             const tokenPerformance =
                 this.trustScoreDb.getTokenPerformance(tokenAddress);
 
-            // eslint-disable-next-line @typescript-eslint/no-unused-vars
-            const tokenProvider = new TokenProvider(
-                tokenPerformance.tokenAddress,
-                this.walletProvider,
-                this.runtime.cacheManager
-            );
-            const balance = tokenPerformance.balance;
+            const balance = tokenPerformance?.balance;
             const sell_recommender_id = recommenderId;
-            const process = this.startProcessInTheSonarBackend(
+            const process = await this.startProcessInTheSonarBackend(
                 tokenAddress,
-                balance,
+                balance || 0,
                 true,
                 sell_recommender_id,
-                tokenPerformance.initialMarketCap
+                tokenPerformance?.initialMarketCap || 0
             );
             if (process) {
                 this.runningProcesses.add(tokenAddress);
@@ -370,20 +334,20 @@ export class SimulationSellingService {
             sellDetails.sell_amount * processedData.tradeData.price;
         const trade = await this.trustScoreDb.getLatestTradePerformance(
             tokenAddress,
-            recommender.id,
+            recommender?.id || "",
             isSimulation
         );
-        const buyTimeStamp = trade.buy_timeStamp;
+        const buyTimeStamp = trade?.buy_timeStamp;
         const marketCap =
             processedData.dexScreenerData.pairs[0]?.marketCap || 0;
         const liquidity =
             processedData.dexScreenerData.pairs[0]?.liquidity.usd || 0;
         const sell_price = processedData.tradeData.price;
-        const profit_usd = sell_value_usd - trade.buy_value_usd;
-        const profit_percent = (profit_usd / trade.buy_value_usd) * 100;
+        const profit_usd = sell_value_usd - (trade?.buy_value_usd || 0);
+        const profit_percent = (profit_usd / (trade?.buy_value_usd || 0)) * 100;
 
-        const market_cap_change = marketCap - trade.buy_market_cap;
-        const liquidity_change = liquidity - trade.buy_liquidity;
+        const market_cap_change = marketCap - (trade?.buy_market_cap || 0);
+        const liquidity_change = liquidity - (trade?.buy_liquidity || 0);
 
         const isRapidDump = await this.isRapidDump(tokenAddress, tokenProvider);
 
@@ -404,8 +368,8 @@ export class SimulationSellingService {
         };
         this.trustScoreDb.updateTradePerformanceOnSell(
             tokenAddress,
-            recommender.id,
-            buyTimeStamp,
+            recommender?.id || "",
+            buyTimeStamp || "",
             sellDetailsData,
             isSimulation
         );
@@ -428,8 +392,8 @@ export class SimulationSellingService {
         this.trustScoreDb.addTransaction(transaction);
         this.updateTradeInBe(
             tokenAddress,
-            recommender.id,
-            recommender.telegramId,
+            recommender?.id || "",
+            recommender?.telegramId || "",
             sellDetailsData,
             tokenBalance
         );
@@ -445,6 +409,10 @@ export class SimulationSellingService {
         Logger.log(
             `Fetched processed token data for token: ${tokenAddress}`
         );
+
+        if (!processedData?.tradeData?.trade_24h_change_percent) {
+            return false;
+        }
 
         return processedData.tradeData.trade_24h_change_percent < -50;
     }

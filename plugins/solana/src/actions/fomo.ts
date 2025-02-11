@@ -1,4 +1,4 @@
-import { generateImage, Logger } from "@hiveai/utils";
+import { Logger } from "@hiveai/utils";
 import {
     Connection,
     Keypair,
@@ -13,7 +13,6 @@ import {
     type ActionExample,
     type Content,
     type HandlerCallback,
-    type IAgentRuntime,
     type Memory,
     ModelClass,
     type State,
@@ -22,7 +21,7 @@ import {
     type Action,
 } from "@hiveai/utils";
 
-import { walletProvider } from "../providers/wallet.ts";
+import { walletProvider } from "../providers/wallet";
 
 interface CreateTokenMetadata {
     name: string;
@@ -404,13 +403,13 @@ Respond with a JSON markdown block containing only the extracted values.`;
 export default {
     name: "CREATE_AND_BUY_TOKEN",
     similes: ["CREATE_AND_PURCHASE_TOKEN", "DEPLOY_AND_BUY_TOKEN"],
-    validate: async (_runtime: IAgentRuntime, _message: Memory) => {
+    validate: async (_runtime: any, _message: Memory) => {
         return true; //return isCreateAndBuyContent(runtime, message.content);
     },
     description:
         "Create a new token and buy a specified amount using SOL. Requires deployer private key, token metadata, buy amount in SOL, priority fee, and allowOffCurve flag.",
     handler: async (
-        runtime: IAgentRuntime,
+        runtime: any,
         message: Memory,
         state: State,
         _options: { [key: string]: unknown },
@@ -474,40 +473,42 @@ export default {
                 }
             } */
 
-        const imageResult = await generateImage(
-            {
-                prompt: `logo for ${tokenMetadata.name} (${tokenMetadata.symbol}) token - ${tokenMetadata.description}`,
-                width: 256,
-                height: 256,
-                count: 1,
-            },
-            runtime
-        );
+        // const imageResult = await generateImage(
+        //     {
+        //         prompt: `logo for ${tokenMetadata.name} (${tokenMetadata.symbol}) token - ${tokenMetadata.description}`,
+        //         width: 256,
+        //         height: 256,
+        //         count: 1,
+        //     },
+        //     runtime
+        // );
 
-        const imageBuffer = Buffer.from(imageResult.data[0], "base64");
-        const formData = new FormData();
-        const blob = new Blob([imageBuffer], { type: "image/png" });
-        formData.append("file", blob, `${tokenMetadata.name}.png`);
-        formData.append("name", tokenMetadata.name);
-        formData.append("symbol", tokenMetadata.symbol);
-        formData.append("description", tokenMetadata.description);
+        // const imageBuffer = Buffer.from(imageResult.data[0], "base64");
+        // const formData = new FormData();
+        // const blob = new Blob([imageBuffer], { type: "image/png" });
+        // formData.append("file", blob, `${tokenMetadata.name}.png`);
+        // formData.append("name", tokenMetadata.name);
+        // formData.append("symbol", tokenMetadata.symbol);
+        // formData.append("description", tokenMetadata.description);
 
-        // FIXME: does fomo.fund have an ipfs call?
-        const metadataResponse = await fetch("https://pump.fun/api/ipfs", {
-            method: "POST",
-            body: formData,
-        });
-        const metadataResponseJSON = (await metadataResponse.json()) as {
-            name: string;
-            symbol: string;
-            metadataUri: string;
-        };
-        // Add the default decimals and convert file to Blob
+        // // FIXME: does fomo.fund have an ipfs call?
+        // const metadataResponse = await fetch("https://pump.fun/api/ipfs", {
+        //     method: "POST",
+        //     body: formData,
+        // });
+        // const metadataResponseJSON = (await metadataResponse.json()) as {
+        //     name: string;
+        //     symbol: string;
+        //     metadataUri: string;
+        // };
+        // // Add the default decimals and convert file to Blob
         const fullTokenMetadata: CreateTokenMetadata = {
             name: tokenMetadata.name,
             symbol: tokenMetadata.symbol,
-            uri: metadataResponseJSON.metadataUri,
+            uri: "",
         };
+
+
 
         // Default priority fee for high network load
         const priorityFee = {
@@ -599,7 +600,7 @@ export default {
             const successMessage = `Token created and purchased successfully! View at: https://fomo.fund/token/${mintKeypair.publicKey.toBase58()}`;
             Logger.log(successMessage);
             return result.success;
-        } catch (error) {
+        } catch (error: any) {
             if (callback) {
                 callback({
                     text: `Error during token creation: ${error.message}`,
