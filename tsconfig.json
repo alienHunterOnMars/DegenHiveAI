@@ -15,15 +15,19 @@
       "forceConsistentCasingInFileNames": true,
       "baseUrl": ".",
       "paths": {
-        "@hiveai/plugin-*": ["*/src"],
         "@hiveai/*": ["*/src"]
       },
       "composite": true,
       "declarationMap": true
     },
     "include": ["src/**/*"],
-    "exclude": ["node_modules", "dist"],
+    "exclude": ["node_modules", "dist", "**/*.test.ts"],
     "references": [
-        { "path": "./utils" }
+        { "path": "./utils" },
+        { "path": "./messaging" },
+        { "path": "./plugins/trustdb" },
+        { "path": "./plugins/solana" },
+        { "path": "./plugins/sui" },
+        { "path": "./plugins/hyperliquid" }
     ]
   }

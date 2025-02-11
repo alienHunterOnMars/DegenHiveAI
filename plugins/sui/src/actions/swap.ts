@@ -69,7 +69,7 @@ export default {
     ): Promise<boolean> => {
         Logger.log("Starting SWAP_TOKEN handler...");
 
-        const service = runtime.getService<SuiService>(
+        const service = runtime.getService(
             ServiceType.TRANSCRIPTION
         );
 
@@ -161,7 +161,7 @@ export default {
                     );
                     
 
-                    if (result.success) {
+                    if (result.success && callback) {
                         callback({
                             text: `Successfully swapped ${swapContent.amount} ${swapContent.from_token} to  ${swapContent.destination_token}, Transaction: ${service.getTransactionLink(
                                 result.tx
@@ -171,26 +171,32 @@ export default {
                     }
                 } catch (error) {
                     Logger.error("Error swapping token:", error);
-                    callback({
-                        text: `Failed to swap ${error}, swapContent : ${JSON.stringify(
-                            swapContent
-                        )}`,
-                        content: { error: "Failed to swap token" },
-                    });
+                    if (callback) {
+                        callback({
+                            text: `Failed to swap ${error}, swapContent : ${JSON.stringify(
+                                swapContent
+                            )}`,
+                            content: { error: "Failed to swap token" },
+                        });
+                    }
                 }
             } else {
-                callback({
-                    text: `destination token: ${swapContent.destination_token} or from token: ${swapContent.from_token} not found`,
-                    content: { error: "Destination token not found" },
-                });
+                if (callback) {
+                    callback({
+                        text: `destination token: ${swapContent.destination_token} or from token: ${swapContent.from_token} not found`,
+                        content: { error: "Destination token not found" },
+                    });
+                }
             }
         } else {
-            callback({
-                text:
-                    "Sorry, I can only swap on the mainnet, parsed params : " +
+            if (callback) {
+                callback({
+                    text:
+                        "Sorry, I can only swap on the mainnet, parsed params : " +
                     JSON.stringify(swapContent, null, 2),
-                content: { error: "Unsupported network" },
-            });
+                    content: { error: "Unsupported network" },
+                });
+            }
             return false;
         }
 

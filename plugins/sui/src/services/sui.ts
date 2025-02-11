@@ -24,11 +24,11 @@ interface SwapResult {
 
 export class SuiService extends Service {
     static serviceType: ServiceType = ServiceType.TRANSCRIPTION;
-    private suiClient: SuiClient;
-    private network: SuiNetwork;
-    private wallet: Signer;
+    private suiClient!: SuiClient;
+    private network!: SuiNetwork;
+    private wallet!: Signer;
 
-    initialize(runtime: any): Promise<void> {
+    async initialize(runtime: any): Promise<void> {
         this.suiClient = new SuiClient({
             url: getFullnodeUrl(
                 runtime.getSetting("SUI_NETWORK") as SuiNetwork
@@ -36,7 +36,7 @@ export class SuiService extends Service {
         });
         this.network = runtime.getSetting("SUI_NETWORK") as SuiNetwork;
         this.wallet = parseAccount(runtime);
-        return null;
+        return Promise.resolve();
     }
 
     async getTokenMetadata(token: string) {
@@ -76,8 +76,11 @@ export class SuiService extends Service {
     ): Promise<SwapResult> {
         const fromMeta = getTokenMetadata(fromToken);
         const toMeta = getTokenMetadata(targetToken);
-        Logger.info("From token metadata:", fromMeta);
-        Logger.info("To token metadata:", toMeta);
+        
+        if (!fromMeta?.tokenAddress || !toMeta?.tokenAddress) {
+            throw new Error('Token metadata not found');
+        }
+
         const client = new AggregatorClient(
             aggregatorURL,
             this.wallet.toSuiAddress(),

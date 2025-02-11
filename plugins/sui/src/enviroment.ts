@@ -1,4 +1,3 @@
-import type { IAgentRuntime } from "@hiveai/utils";
 import { z } from "zod";
 
 export const suiEnvSchema = z.object({
@@ -9,7 +8,7 @@ export const suiEnvSchema = z.object({
 export type SuiConfig = z.infer<typeof suiEnvSchema>;
 
 export async function validateSuiConfig(
-    runtime: IAgentRuntime
+    runtime: any
 ): Promise<SuiConfig> {
     try {
         const config = {

@@ -27,8 +27,8 @@ export const spotTrade: Action = {
     handler: async (
         runtime: any,
         message: Memory,
-        state: State,
-        _options: Record<string, unknown>,
+        state?: State,
+        options?: { [key: string]: unknown },
         callback?: HandlerCallback
     ) => {
         try {
@@ -77,7 +77,7 @@ export const spotTrade: Action = {
 
             // Find token and market
             const tokenIndex = meta.tokens.findIndex(
-                (token) =>
+                (token: any) =>
                     token.name.toUpperCase() ===
                     validatedOrder.coin.toUpperCase()
             );
@@ -90,7 +90,7 @@ export const spotTrade: Action = {
             Logger.info("Found token:", tokenInfo.name);
 
             const marketIndex = assetCtxs.findIndex(
-                (ctx) => ctx.coin === `${validatedOrder.coin}-SPOT`
+                (ctx: any) => ctx.coin === `${validatedOrder.coin}-SPOT`
             );
             if (marketIndex === -1) {
                 throw new HyperliquidError(
@@ -129,7 +129,7 @@ export const spotTrade: Action = {
                 }
             } else {
                 // For limit orders
-                finalPrice = validatedOrder.limit_px;
+                finalPrice = validatedOrder.limit_px!;
 
                 // Validate limit order price is optimal
                 if (validatedOrder.is_buy && finalPrice > midPrice) {
@@ -163,7 +163,7 @@ export const spotTrade: Action = {
             }
 
             // Prepare and place order
-            const rounded_px = Number(finalPrice.toFixed(tokenInfo.szDecimals));
+            const rounded_px = Number(finalPrice.toFixed((tokenInfo as any).szDecimals));
             const orderRequest = {
                 coin: `${validatedOrder.coin}-SPOT`,
                 asset: 10000 + marketIndex,
@@ -202,7 +202,7 @@ export const spotTrade: Action = {
             }
 
             return true;
-        } catch (error) {
+        } catch (error: any) {
             Logger.error("Error placing spot order:", error);
             if (callback) {
                 callback({

@@ -24,8 +24,7 @@
 	},
 	"dependencies": {
 		"@hiveai/utils": "workspace:*",
-		"@visvirial/hyperliquid": "^1.2.2",
-		"hyperliquid": "^1.5.6",
+		"hyperliquid": "^1.5.8",
 		"zod": "^3.23.8"
 	},
 	"devDependencies": {

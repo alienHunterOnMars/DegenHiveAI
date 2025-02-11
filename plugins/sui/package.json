@@ -29,13 +29,16 @@
         "vitest": "2.1.4"
     },
     "scripts": {
-		"build": "tsup",
-		"dev": "tsup --watch",
-		"test": "vitest run",
-		"test:coverage": "vitest run --coverage"
+        "build": "tsup",
+        "dev": "tsup --watch",
+        "test": "vitest run",
+        "test:coverage": "vitest run --coverage"
     },
     "peerDependencies": {
         "form-data": "4.0.1",
         "whatwg-url": "7.1.0"
+    },
+    "devDependencies": {
+        "@types/bn.js": "^5.1.6"
     }
 }

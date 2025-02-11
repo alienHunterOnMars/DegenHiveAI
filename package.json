@@ -4,7 +4,8 @@
     "private": true,
     "type": "module",
     "scripts": {
-        "build": "npm run build:utils && npm run build:messaging && npm run build:adapters && npm run build:plugins && tsc",
+        "build": "npm run build:deps && tsc -b && npm run copy-utils",
+        "build:deps": "npm run build:utils && npm run build:messaging && npm run build:adapters && npm run build:plugins",
         "build:utils": "cd utils && npm run build",
         "build:messaging": "cd messaging && tsc -b",
         "build:adapters": "npm run build:discord && npm run build:farcaster && npm run build:reddit && npm run build:telegram && npm run build:twitter && npm run build:email",
@@ -21,9 +22,10 @@
         "build:trustdb": "cd plugins/trustdb && npm run build",
         "start": "node --experimental-modules --es-module-specifier-resolution=node dist/start_hive_swarm.js",
         "dev": "ts-node src/start_hive_swarm.ts",
-        "clean": "rm -rf dist && npm run clean:adapters",
+        "copy-utils": "cp -r src/utils dist/",
+        "clean": "rm -rf dist && npm run clean:adapters && npm run clean:plugins",
         "clean:adapters": "cd adapters && for d in */; do rm -rf \"$d/dist\"; done",
-        "prebuild": "npm run clean"
+        "clean:plugins": "cd plugins && for d in */; do rm -rf \"$d/dist\"; done"
     },
     "workspaces": [
         "adapters/*",

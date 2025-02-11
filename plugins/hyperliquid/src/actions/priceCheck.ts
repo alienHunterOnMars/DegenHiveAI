@@ -21,8 +21,8 @@ export const priceCheck: Action = {
     handler: async (
         runtime: any,
         message: Memory,
-        state: State,
-        _options: Record<string, unknown>,
+        state?: State,
+        options?: { [key: string]: unknown },
         callback?: HandlerCallback
     ) => {
         try {
@@ -62,7 +62,7 @@ export const priceCheck: Action = {
 
             // Find token and market
             const tokenIndex = meta.tokens.findIndex(
-                (token) =>
+                (token: any) =>
                     token.name.toUpperCase() === content.symbol.toUpperCase()
             );
             if (tokenIndex === -1) {
@@ -72,7 +72,7 @@ export const priceCheck: Action = {
             }
 
             const marketIndex = assetCtxs.findIndex(
-                (ctx) => ctx.coin === `${content.symbol}-SPOT`
+                (ctx: any) => ctx.coin === `${content.symbol}-SPOT`
             );
             if (marketIndex === -1) {
                 throw new HyperliquidError(
@@ -108,7 +108,7 @@ export const priceCheck: Action = {
             }
 
             return true;
-        } catch (error) {
+        } catch (error: any) {
             Logger.error("Error checking price:", error);
             if (callback) {
                 callback({

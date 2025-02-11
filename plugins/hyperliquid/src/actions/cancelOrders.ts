@@ -17,9 +17,9 @@ export const cancelOrders: Action = {
     },
     handler: async (
         runtime: any,
-        _message: Memory,
-        _state: State,
-        _options: Record<string, unknown>,
+        message: Memory,
+        state?: State,
+        options?: { [key: string]: unknown },
         callback?: HandlerCallback
     ) => {
         try {
@@ -48,7 +48,7 @@ export const cancelOrders: Action = {
             }
 
             return true;
-        } catch (error) {
+        } catch (error: any) {
             Logger.error("Error cancelling orders:", error);
             if (callback) {
                 callback({
