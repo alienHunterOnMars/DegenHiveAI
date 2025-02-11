@@ -30,7 +30,7 @@ import dotenv from 'dotenv';
 import { loadConfig } from './utils/config';
 import * as fs from 'fs';
 import { solanaPlugin } from '@hiveai/plugin-solana';
-// import { suiPlugin } from '@hiveai/plugin-sui';
+import { suiPlugin } from '@hiveai/plugin-sui';
 // import { hyperliquidPlugin } from '@hiveai/plugin-hyperliquid';
 import { trustDBPlugin } from '@hiveai/plugin-trustdb';
 

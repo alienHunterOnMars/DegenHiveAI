@@ -8,7 +8,7 @@
         "build:utils": "cd utils && npm run build",
         "build:messaging": "cd messaging && tsc -b",
         "build:adapters": "npm run build:discord && npm run build:farcaster && npm run build:reddit && npm run build:telegram && npm run build:twitter && npm run build:email",
-        "build:plugins": "npm run build:trustdb && npm run build:solana",
+        "build:plugins": "npm run build:trustdb && npm run build:solana && npm run build:sui",
         "build:discord": "cd adapters/discord && npm run build",
         "build:farcaster": "cd adapters/farcaster && npm run build",
         "build:reddit": "cd adapters/reddit && npm run build",

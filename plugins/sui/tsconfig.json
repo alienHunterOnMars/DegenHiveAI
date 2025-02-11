@@ -2,9 +2,25 @@
     "extends": "../../tsconfig.json",
     "compilerOptions": {
         "outDir": "./dist",
-        "rootDir": "./src"
+        "rootDir": "./src",
+        "composite": true,
+        "declaration": true,
+        "paths": {
+            "@hiveai/*": ["../../*/src"]
+        }
     },
+    "files": [
+        "src/index.ts"
+    ],
     "include": [
-        "./src/**/*.ts"
+        "src/**/*.ts",
+        "src/providers/**/*.ts",
+        "src/actions/**/*.ts",
+        "src/services/**/*.ts"
+    ],
+    "exclude": ["**/*.test.ts", "node_modules", "dist"],
+    "references": [
+        { "path": "../../utils" },
+        { "path": "../trustdb" }
     ]
 } 
