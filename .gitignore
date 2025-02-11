@@ -96,3 +96,4 @@ extra
 **/dist/**
 configenv.json
 env.json
+pnpm-lock.yaml

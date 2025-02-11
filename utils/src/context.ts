@@ -108,7 +108,7 @@ export const composeRandomUser = (template: string, length: number) => {
     );
     let result = template;
     for (let i = 0; i < exampleNames.length; i++) {
-        result = result.replaceAll(`{{user${i + 1}}}`, exampleNames[i]);
+        result = result.replace(new RegExp(`{{user${i + 1}}}`, 'g'), exampleNames[i]);
     }
 
     return result;

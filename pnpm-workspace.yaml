@@ -1,8 +1,10 @@
 packages:
   - 'adapters/*'
   - 'services/*'
-  - 'plugins/trustdb'
-  - 'plugins/solana'
   - 'core'
   - 'utils'
   - 'messaging' 
+  - 'plugins/sui'
+  - 'plugins/hyperliquid'
+  - 'plugins/trustdb'
+  - 'plugins/solana'
