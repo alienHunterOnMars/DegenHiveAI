@@ -17,9 +17,10 @@
 		"dist"
 	],
 	"scripts": {
-		"build": "tsup --format esm --dts",
-		"dev": "tsup --format esm --dts --watch",
-		"test": "vitest run"
+		"build": "tsup",
+		"dev": "tsup --watch",
+		"test": "vitest run",
+		"test:coverage": "vitest run --coverage"
 	},
 	"dependencies": {
 		"@hiveai/utils": "workspace:*",
