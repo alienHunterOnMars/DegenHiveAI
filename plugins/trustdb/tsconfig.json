@@ -2,8 +2,23 @@
     "extends": "../../tsconfig.json",
     "compilerOptions": {
         "outDir": "./dist",
-        "rootDir": "./src"
+        "rootDir": "./src",
+        "composite": true,
+        "declaration": true,
+        "declarationMap": true,
+        "sourceMap": true,
+        "moduleResolution": "node",
+        "paths": {
+            "@hiveai/*": ["../../*/src"]
+        }
     },
+    "references": [
+        { "path": "../../utils" }
+    ],
+    "files": [
+        "src/index.ts",
+        "src/trustScoreDatabase.ts"
+    ],
     "include": [
         "./src/**/*.ts"
     ]

@@ -1,5 +1,6 @@
 import type { Database } from "better-sqlite3";
 import { v4 as uuidv4 } from "uuid";
+import { TrustDBConfig } from './index';
 
 export interface Recommender {
     id: string; // UUID
@@ -141,9 +142,11 @@ interface Transaction {
 
 export class TrustScoreDatabase {
     private db: Database;
+    private config: TrustDBConfig;
 
-    constructor(db: Database) {
-        this.db = db;
+    constructor(config: TrustDBConfig) {
+        this.config = config;
+        this.db = config.db;
         // load(db);
         // check if the tables exist, if not create them
         const tables = this.db
@@ -322,6 +325,14 @@ export class TrustScoreDatabase {
             FOREIGN KEY (token_address) REFERENCES token_performance(token_address) ON DELETE CASCADE
         );
     `);
+    }
+
+    async connect() {
+        // Implement connection logic
+    }
+
+    async disconnect() {
+        // Implement disconnect logic
     }
 
     /**
