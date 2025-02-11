@@ -4,7 +4,6 @@
     "private": true,
     "type": "module",
     "scripts": {
-      "build:messaging": "cd messaging && tsc -b",
         "build": "npm run build:utils && npm run build:messaging && npm run build:plugins && tsc",
         "build:utils": "cd utils && npm run build",
         "build:messaging": "cd messaging && tsc -b",
@@ -26,26 +25,27 @@
         "clean:adapters": "cd adapters && for d in */; do rm -rf \"$d/dist\"; done",
         "prebuild": "npm run clean"
     },
-     "workspaces": [
+    "workspaces": [
         "adapters/*",
         "plugins/trustdb",
         "plugins/solana",
         "plugins/sui",
         "plugins/hyperliquid"
-      ],
+    ],
     "dependencies": {
         "@hiveai/adapters-discord": "workspace:*",
+        "@hiveai/adapters-email": "workspace:*",
+        "@hiveai/adapters-farcaster": "workspace:*",
         "@hiveai/adapters-reddit": "workspace:*",
         "@hiveai/adapters-telegram": "workspace:*",
         "@hiveai/adapters-twitter": "workspace:*",
-        "@hiveai/adapters-farcaster": "workspace:*",
-        "@hiveai/adapters-email": "workspace:*",
         "@hiveai/messaging": "workspace:*",
-        "@hiveai/utils": "workspace:*",
+        "@hiveai/plugin-hyperliquid": "workspace:*",
         "@hiveai/plugin-solana": "workspace:*",
         "@hiveai/plugin-sui": "workspace:*",
-        "@hiveai/plugin-hyperliquid": "workspace:*",
         "@hiveai/plugin-trustdb": "workspace:*",
+        "@hiveai/utils": "workspace:*",
+        "amqplib": "^0.10.5",
         "dotenv": "^16.3.1",
         "node-telegram-bot-api": "^0.64.0",
         "openai": "^4.0.0",
@@ -68,4 +68,4 @@
     "engines": {
         "node": ">=18.0.0"
     }
-} 
+}

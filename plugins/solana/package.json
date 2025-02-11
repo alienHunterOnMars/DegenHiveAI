@@ -35,9 +35,10 @@
 		"vitest": "2.1.4"
 	},
 	"scripts": {
-		"build": "tsup --format esm --dts",
-		"dev": "tsup --format esm --dts --watch",
-		"test": "vitest run"
+		"build": "tsup",
+		"dev": "tsup --watch",
+		"test": "vitest run",
+		"test:coverage": "vitest run --coverage"
 	},
 	"peerDependencies": {
 		"form-data": "4.0.1",
