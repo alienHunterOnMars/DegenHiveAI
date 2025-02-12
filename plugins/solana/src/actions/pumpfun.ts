@@ -1,6 +1,5 @@
 import { Logger } from "@hiveai/utils";
-import { Connection, Keypair, type PublicKey } from "@solana/web3.js";
-import { VersionedTransaction } from "@solana/web3.js";
+import { Connection, Keypair, PublicKey, VersionedTransaction } from "@solana/web3.js";
 import { Fomo, type PurchaseCurrency } from "fomo-sdk-solana";
 import { getAssociatedTokenAddressSync } from "@solana/spl-token";
 import bs58 from "bs58";
@@ -17,137 +16,164 @@ import {
     type Action,
 } from "@hiveai/utils";
 
-import { walletProvider } from "../providers/wallet";
-
-interface CreateTokenMetadata {
+export interface TokenMetadata {
     name: string;
     symbol: string;
-    uri: string;
+    description: string;
+    image_description: string;
+    uri?: string;
 }
 
-export interface CreateAndBuyContent extends Content {
-    tokenMetadata: {
-        name: string;
-        symbol: string;
-        description: string;
-        image_description: string;
+export interface PumpFunParams {
+    connection: Connection;
+    keypair: Keypair;
+    function_name: "createAndBuyToken" | "buyToken" | "sellToken";
+    params: {
+        tokenMetadata?: TokenMetadata;
+        buyAmountSol?: number;
+        mint?: string;
+        amount?: number;
+        priorityFee?: number;
+        requiredLiquidity?: number;
+        allowOffCurve?: boolean;
+        slippage?: string | number;
     };
-    buyAmountSol: string | number;
-    requiredLiquidity: string | number;
 }
 
-export function isCreateAndBuyContentForFomo(
-    content: any
-): content is CreateAndBuyContent {
-    Logger.log("Content for create & buy", content);
-    return (
-        typeof content.tokenMetadata === "object" &&
-        content.tokenMetadata !== null &&
-        typeof content.tokenMetadata.name === "string" &&
-        typeof content.tokenMetadata.symbol === "string" &&
-        typeof content.tokenMetadata.description === "string" &&
-        typeof content.tokenMetadata.image_description === "string" &&
-        (typeof content.buyAmountSol === "string" ||
-            typeof content.buyAmountSol === "number") &&
-        typeof content.requiredLiquidity === "number"
-    );
-}
+export default {    
+    name: "PUMP_FUN",
+    description: "Trade tokens on Pump.fun",
 
-export const createAndBuyToken = async ({
+    async handler({
+        connection,
+        keypair,
+        function_name,
+        params
+    }: PumpFunParams): Promise<any> {
+
+        // Initialize FOMO SDK with mainnet cluster
+        const fomo = new Fomo(connection, "mainnet-beta", keypair);
+
+        if (function_name === "createAndBuyToken") {
+            if (!params.tokenMetadata || !params.buyAmountSol) {
+                throw new Error("Missing required parameters: tokenMetadata and buyAmountSol");
+            }
+            return await createAndBuyToken({
+                deployer: keypair,
+                mint: keypair,
+                tokenMetadata: params.tokenMetadata,
+                buyAmountSol: params.buyAmountSol,
+                priorityFee: params.priorityFee || 100_000,
+                requiredLiquidity: params.requiredLiquidity || 85,
+                allowOffCurve: params.allowOffCurve || false,
+                connection: connection,
+                fomo: fomo,
+                slippage: String(params.slippage || "1000")
+            });
+        }
+
+        if (function_name === "buyToken") {
+            if (!params.mint || !params.amount) {
+                throw new Error("Missing required parameters: mint and amount");
+            }
+            return await buyToken({
+                fomo: fomo,
+                buyer: keypair,
+                mint: new PublicKey(params.mint),
+                amount: Number(params.amount),
+                priorityFee: Number(params.priorityFee) || 100_000,
+                allowOffCurve: Boolean(params.allowOffCurve),
+                slippage: Number(params.slippage) || 1,
+                connection: connection,
+                currency: "sol" as PurchaseCurrency,
+                commitment: "confirmed"
+            });
+        }
+
+        if (function_name === "sellToken") {
+            if (!params.mint || !params.amount) {
+                throw new Error("Missing required parameters: mint and amount");
+            }
+            return await sellToken({
+                fomo: fomo,
+                seller: keypair,
+                mint: new PublicKey(params.mint),
+                amount: Number(params.amount),
+                priorityFee: Number(params.priorityFee) || 100_000,
+                slippage: Number(params.slippage) || 1,
+                allowOffCurve: Boolean(params.allowOffCurve),
+                connection: connection,
+                currency: "token" as PurchaseCurrency,
+                commitment: "confirmed"
+            });
+        }
+    }
+};
+
+const createAndBuyToken = async ({
     deployer,
     mint,
     tokenMetadata,
     buyAmountSol,
     priorityFee,
-    requiredLiquidity = 85,
+    requiredLiquidity,
     allowOffCurve,
-    commitment = "confirmed",
-    fomo,
     connection,
+    fomo,
+    slippage
 }: {
     deployer: Keypair;
     mint: Keypair;
-    tokenMetadata: CreateTokenMetadata;
-    buyAmountSol: bigint;
+    tokenMetadata: TokenMetadata;
+    buyAmountSol: number;
     priorityFee: number;
     requiredLiquidity: number;
     allowOffCurve: boolean;
-    commitment?:
-        | "processed"
-        | "confirmed"
-        | "finalized"
-        | "recent"
-        | "single"
-        | "singleGossip"
-        | "root"
-        | "max";
-    fomo: Fomo;
     connection: Connection;
+    fomo: Fomo;
     slippage: string;
 }) => {
     const { transaction: versionedTx } = await fomo.createToken(
         deployer.publicKey,
         tokenMetadata.name,
         tokenMetadata.symbol,
-        tokenMetadata.uri,
+        tokenMetadata.uri || "",
         priorityFee,
         bs58.encode(mint.secretKey),
         requiredLiquidity,
         Number(buyAmountSol) / 10 ** 9
     );
 
-    const { blockhash, lastValidBlockHeight } =
-        await connection.getLatestBlockhash();
+    const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
     versionedTx.message.recentBlockhash = blockhash;
     versionedTx.sign([mint]);
 
     const serializedTransaction = versionedTx.serialize();
-    const serializedTransactionBase64 = Buffer.from(
-        serializedTransaction
-    ).toString("base64");
-
-    const deserializedTx = VersionedTransaction.deserialize(
-        Buffer.from(serializedTransactionBase64, "base64")
-    );
+    const serializedTransactionBase64 = Buffer.from(serializedTransaction).toString("base64");
+    const deserializedTx = VersionedTransaction.deserialize(Buffer.from(serializedTransactionBase64, "base64"));
 
     const txid = await connection.sendTransaction(deserializedTx, {
         skipPreflight: false,
         maxRetries: 3,
-        preflightCommitment: "confirmed",
+        preflightCommitment: "confirmed"
     });
 
     Logger.log("Transaction sent:", txid);
 
-    // Confirm transaction using the blockhash
-    const confirmation = await connection.confirmTransaction(
-        {
-            signature: txid,
-            blockhash: blockhash,
-            lastValidBlockHeight: lastValidBlockHeight,
-        },
-        commitment
-    );
+    const confirmation = await connection.confirmTransaction({
+        signature: txid,
+        blockhash: blockhash,
+        lastValidBlockHeight: lastValidBlockHeight
+    });
 
     if (!confirmation.value.err) {
-        Logger.log(
-            "Success:",
-            `https://fomo.fund/token/${mint.publicKey.toBase58()}`
-        );
-        const ata = getAssociatedTokenAddressSync(
-            mint.publicKey,
-            deployer.publicKey,
-            allowOffCurve
-        );
-        const balance = await connection.getTokenAccountBalance(
-            ata,
-            "processed"
-        );
+        Logger.log("Success:", `https://fomo.fund/token/${mint.publicKey.toBase58()}`);
+        const ata = getAssociatedTokenAddressSync(mint.publicKey, deployer.publicKey, allowOffCurve);
+        const balance = await connection.getTokenAccountBalance(ata, "processed");
         const amount = balance.value.uiAmount;
+        
         if (amount === null) {
-            Logger.log(
-                `${deployer.publicKey.toBase58()}:`,
-                "No Account Found"
-            );
+            Logger.log(`${deployer.publicKey.toBase58()}:`, "No Account Found");
         } else {
             Logger.log(`${deployer.publicKey.toBase58()}:`, amount);
         }
@@ -167,7 +193,7 @@ export const createAndBuyToken = async ({
     }
 };
 
-export const buyToken = async ({
+const buyToken = async ({
     fomo,
     buyer,
     mint,
@@ -176,8 +202,8 @@ export const buyToken = async ({
     allowOffCurve,
     slippage,
     connection,
-    currency = "sol",
-    commitment = "confirmed",
+    currency,
+    commitment
 }: {
     fomo: Fomo;
     buyer: Keypair;
@@ -188,15 +214,7 @@ export const buyToken = async ({
     slippage: number;
     connection: Connection;
     currency: PurchaseCurrency;
-    commitment?:
-        | "processed"
-        | "confirmed"
-        | "finalized"
-        | "recent"
-        | "single"
-        | "singleGossip"
-        | "root"
-        | "max";
+    commitment: string;
 }) => {
     const buyVersionedTx = await fomo.buyToken(
         buyer.publicKey,
@@ -204,60 +222,38 @@ export const buyToken = async ({
         amount,
         slippage,
         priorityFee,
-        currency || "sol"
+        currency
     );
 
-    const { blockhash, lastValidBlockHeight } =
-        await connection.getLatestBlockhash();
+    const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
     buyVersionedTx.message.recentBlockhash = blockhash;
 
     const serializedTransaction = buyVersionedTx.serialize();
-    const serializedTransactionBase64 = Buffer.from(
-        serializedTransaction
-    ).toString("base64");
-
-    const deserializedTx = VersionedTransaction.deserialize(
-        Buffer.from(serializedTransactionBase64, "base64")
-    );
+    const serializedTransactionBase64 = Buffer.from(serializedTransaction).toString("base64");
+    const deserializedTx = VersionedTransaction.deserialize(Buffer.from(serializedTransactionBase64, "base64"));
 
     const txid = await connection.sendTransaction(deserializedTx, {
         skipPreflight: false,
         maxRetries: 3,
-        preflightCommitment: "confirmed",
+        preflightCommitment: "confirmed"
     });
 
     Logger.log("Transaction sent:", txid);
 
-    // Confirm transaction using the blockhash
-    const confirmation = await connection.confirmTransaction(
-        {
-            signature: txid,
-            blockhash: blockhash,
-            lastValidBlockHeight: lastValidBlockHeight,
-        },
-        commitment
-    );
+    const confirmation = await connection.confirmTransaction({
+        signature: txid,
+        blockhash: blockhash,
+        lastValidBlockHeight: lastValidBlockHeight
+    });
 
     if (!confirmation.value.err) {
-        Logger.log(
-            "Success:",
-            `https://fomo.fund/token/${mint.toBase58()}`
-        );
-        const ata = getAssociatedTokenAddressSync(
-            mint,
-            buyer.publicKey,
-            allowOffCurve
-        );
-        const balance = await connection.getTokenAccountBalance(
-            ata,
-            "processed"
-        );
+        Logger.log("Success:", `https://fomo.fund/token/${mint.toBase58()}`);
+        const ata = getAssociatedTokenAddressSync(mint, buyer.publicKey, allowOffCurve);
+        const balance = await connection.getTokenAccountBalance(ata, "processed");
         const amount = balance.value.uiAmount;
+        
         if (amount === null) {
-            Logger.log(
-                `${buyer.publicKey.toBase58()}:`,
-                "No Account Found"
-            );
+            Logger.log(`${buyer.publicKey.toBase58()}:`, "No Account Found");
         } else {
             Logger.log(`${buyer.publicKey.toBase58()}:`, amount);
         }
@@ -266,36 +262,28 @@ export const buyToken = async ({
     }
 };
 
-export const sellToken = async ({
+const sellToken = async ({
     fomo,
     seller,
     mint,
     amount,
     priorityFee,
-    allowOffCurve,
     slippage,
+    allowOffCurve,
     connection,
-    currency = "token",
-    commitment = "confirmed",
+    currency,
+    commitment
 }: {
     fomo: Fomo;
     seller: Keypair;
     mint: PublicKey;
     amount: number;
     priorityFee: number;
-    allowOffCurve: boolean;
     slippage: number;
+    allowOffCurve: boolean;
     connection: Connection;
     currency: PurchaseCurrency;
-    commitment?:
-        | "processed"
-        | "confirmed"
-        | "finalized"
-        | "recent"
-        | "single"
-        | "singleGossip"
-        | "root"
-        | "max";
+    commitment: string;
 }) => {
     const sellVersionedTx = await fomo.sellToken(
         seller.publicKey,
@@ -303,60 +291,38 @@ export const sellToken = async ({
         amount,
         slippage,
         priorityFee,
-        currency || "token"
+        currency
     );
 
-    const { blockhash, lastValidBlockHeight } =
-        await connection.getLatestBlockhash();
+    const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
     sellVersionedTx.message.recentBlockhash = blockhash;
 
     const serializedTransaction = sellVersionedTx.serialize();
-    const serializedTransactionBase64 = Buffer.from(
-        serializedTransaction
-    ).toString("base64");
-
-    const deserializedTx = VersionedTransaction.deserialize(
-        Buffer.from(serializedTransactionBase64, "base64")
-    );
+    const serializedTransactionBase64 = Buffer.from(serializedTransaction).toString("base64");
+    const deserializedTx = VersionedTransaction.deserialize(Buffer.from(serializedTransactionBase64, "base64"));
 
     const txid = await connection.sendTransaction(deserializedTx, {
         skipPreflight: false,
         maxRetries: 3,
-        preflightCommitment: "confirmed",
+        preflightCommitment: "confirmed"
     });
 
     Logger.log("Transaction sent:", txid);
 
-    // Confirm transaction using the blockhash
-    const confirmation = await connection.confirmTransaction(
-        {
-            signature: txid,
-            blockhash: blockhash,
-            lastValidBlockHeight: lastValidBlockHeight,
-        },
-        commitment
-    );
+    const confirmation = await connection.confirmTransaction({
+        signature: txid,
+        blockhash: blockhash,
+        lastValidBlockHeight: lastValidBlockHeight
+    });
 
     if (!confirmation.value.err) {
-        Logger.log(
-            "Success:",
-            `https://fomo.fund/token/${mint.toBase58()}`
-        );
-        const ata = getAssociatedTokenAddressSync(
-            mint,
-            seller.publicKey,
-            allowOffCurve
-        );
-        const balance = await connection.getTokenAccountBalance(
-            ata,
-            "processed"
-        );
+        Logger.log("Success:", `https://fomo.fund/token/${mint.toBase58()}`);
+        const ata = getAssociatedTokenAddressSync(mint, seller.publicKey, allowOffCurve);
+        const balance = await connection.getTokenAccountBalance(ata, "processed");
         const amount = balance.value.uiAmount;
+        
         if (amount === null) {
-            Logger.log(
-                `${seller.publicKey.toBase58()}:`,
-                "No Account Found"
-            );
+            Logger.log(`${seller.publicKey.toBase58()}:`, "No Account Found");
         } else {
             Logger.log(`${seller.publicKey.toBase58()}:`, amount);
         }
@@ -369,265 +335,153 @@ const promptConfirmation = async (): Promise<boolean> => {
     return true;
 };
 
-const fomoTemplate = `Respond with a JSON markdown block containing only the extracted values. Use null for any values that cannot be determined.
+// export default {
+//     name: "PUMP_FUN",
+//     description: "Create and buy a new token on Pump.fun",
 
-Example response:
-\`\`\`json
-{
-    "tokenMetadata": {
-        "name": "Test Token",
-        "symbol": "TEST",
-        "description": "A test token",
-        "image_description": "create an image of a rabbit"
-    },
-    "buyAmountSol": "0.00069",
-    "requiredLiquidity": "85"
-}
-\`\`\`
+//     async handler({
+//         connection,
+//         keypair,
+//         tokenMetadata,
+//         buyAmountSol,
+//         requiredLiquidity = 85
+//     }: {
+//         connection: Connection;
+//         keypair: Keypair;
+//         tokenMetadata: CreateTokenMetadata;
+//         buyAmountSol: number;
+//         requiredLiquidity?: number;
+//     }): Promise<any> {
+//         try {
+//             Logger.info("Starting Pump.fun token creation...");
 
-{{recentMessages}}
+//             // Generate mint keypair for the new token
+//             const mintKeypair = Keypair.generate();
+//             Logger.info(`Generated mint address: ${mintKeypair.publicKey.toBase58()}`);
 
-Given the recent messages, extract or generate (come up with if not included) the following information about the requested token creation:
-- Token name
-- Token symbol
-- Token description
-- Token image description
-- Amount of SOL to buy
+//             // Create metadata URI using Pump.fun's API
+//             const formData = new FormData();
+//             formData.append("name", tokenMetadata.name);
+//             formData.append("symbol", tokenMetadata.symbol);
+//             formData.append("description", tokenMetadata.description);
 
-Respond with a JSON markdown block containing only the extracted values.`;
+//             const metadataResponse = await fetch("https://pump.fun/api/ipfs", {
+//                 method: "POST",
+//                 body: formData,
+//             });
 
-export default {
-    name: "CREATE_AND_BUY_TOKEN",
-    similes: ["CREATE_AND_PURCHASE_TOKEN", "DEPLOY_AND_BUY_TOKEN"],
-    validate: async (_runtime: any, _message: Memory) => {
-        return true; //return isCreateAndBuyContent(runtime, message.content);
-    },
-    description:
-        "Create a new token and buy a specified amount using SOL. Requires deployer private key, token metadata, buy amount in SOL, priority fee, and allowOffCurve flag.",
-    handler: async (
-        runtime: any,
-        message: Memory,
-        state: State,
-        _options: { [key: string]: unknown },
-        callback?: HandlerCallback
-    ): Promise<boolean> => {
-        Logger.log("Starting CREATE_AND_BUY_TOKEN handler...");
+//             const metadataResponseJSON = await metadataResponse.json();
+//             if (!metadataResponseJSON.metadataUri) {
+//                 throw new Error("Failed to create token metadata");
+//             }
 
-        // Compose state if not provided
-        if (!state) {
-            state = (await runtime.composeState(message)) as State;
-        } else {
-            state = await runtime.updateRecentMessageState(state);
-        }
+//             // Convert SOL to lamports
+//             const lamports = BigInt(Math.floor(buyAmountSol * 1e9));
 
-        // Get wallet info for context
-        const walletInfo = await walletProvider.get(runtime, message, state);
-        state.walletInfo = walletInfo;
+//             // Get create token transaction from Pump.fun's API
+//             const createTokenResponse = await fetch("https://pump.fun/api/create-token", {
+//                 method: "POST",
+//                 headers: {
+//                     "Content-Type": "application/json",
+//                 },
+//                 body: JSON.stringify({
+//                     creator: keypair.publicKey.toBase58(),
+//                     name: tokenMetadata.name,
+//                     symbol: tokenMetadata.symbol,
+//                     metadataUri: metadataResponseJSON.metadataUri,
+//                     mintKeypair: bs58.encode(mintKeypair.secretKey),
+//                     requiredLiquidity,
+//                     buyAmount: Number(lamports) / 1e9
+//                 }),
+//             });
 
-        // Generate structured content from natural language
-        const pumpContext = composeContext({
-            state,
-            template: fomoTemplate,
-        });
+//             const createTokenData = await createTokenResponse.json();
+//             if (!createTokenData.transaction) {
+//                 throw new Error("Failed to get create token transaction");
+//             }
 
-        const content = await generateObject({
-            runtime,
-            context: pumpContext,
-            modelClass: ModelClass.LARGE,
-        });
+//             // Deserialize and sign transaction
+//             const transactionBuf = Buffer.from(createTokenData.transaction, "base64");
+//             const transaction = VersionedTransaction.deserialize(transactionBuf);
+//             transaction.sign([keypair, mintKeypair]);
 
-        // Validate the generated content
-        if (!isCreateAndBuyContentForFomo(content)) {
-            Logger.error(
-                "Invalid content for CREATE_AND_BUY_TOKEN action."
-            );
-            return false;
-        }
+//             // Send and confirm transaction
+//             const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
+            
+//             const txid = await connection.sendTransaction(transaction, {
+//                 skipPreflight: false,
+//                 maxRetries: 3,
+//                 preflightCommitment: "confirmed"
+//             });
 
-        const { tokenMetadata, buyAmountSol, requiredLiquidity } = content;
-        /*
-            // Generate image if tokenMetadata.file is empty or invalid
-            if (!tokenMetadata.file || tokenMetadata.file.length < 100) {  // Basic validation
-                try {
-                    const imageResult = await generateImage({
-                        prompt: `logo for ${tokenMetadata.name} (${tokenMetadata.symbol}) token - ${tokenMetadata.description}`,
-                        width: 512,
-                        height: 512,
-                        count: 1
-                    }, runtime);
+//             Logger.info("Transaction sent:", txid);
 
-                    if (imageResult.success && imageResult.data && imageResult.data.length > 0) {
-                        // Remove the "data:image/png;base64," prefix if present
-                        tokenMetadata.file = imageResult.data[0].replace(/^data:image\/[a-z]+;base64,/, '');
-                    } else {
-                        Logger.error("Failed to generate image:", imageResult.error);
-                        return false;
-                    }
-                } catch (error) {
-                    Logger.error("Error generating image:", error);
-                    return false;
-                }
-            } */
+//             const confirmation = await connection.confirmTransaction({
+//                 signature: txid,
+//                 blockhash,
+//                 lastValidBlockHeight
+//             }, "confirmed");
 
-        // const imageResult = await generateImage(
-        //     {
-        //         prompt: `logo for ${tokenMetadata.name} (${tokenMetadata.symbol}) token - ${tokenMetadata.description}`,
-        //         width: 256,
-        //         height: 256,
-        //         count: 1,
-        //     },
-        //     runtime
-        // );
+//             if (confirmation.value.err) {
+//                 throw new Error(`Transaction failed: ${confirmation.value.err}`);
+//             }
 
-        const formData = new FormData();
-        formData.append("name", tokenMetadata.name);
-        formData.append("symbol", tokenMetadata.symbol);
-        formData.append("description", tokenMetadata.description);
+//             Logger.info("Token creation completed successfully!");
 
-        // FIXME: does fomo.fund have an ipfs call?
-        const metadataResponse = await fetch("https://pump.fun/api/ipfs", {
-            method: "POST",
-            body: formData,
-        });
-        const metadataResponseJSON = (await metadataResponse.json()) as {
-            name: string;
-            symbol: string;
-            metadataUri: string;
-        };
-        // Add the default decimals and convert file to Blob
-        const fullTokenMetadata: CreateTokenMetadata = {
-            name: tokenMetadata.name,
-            symbol: tokenMetadata.symbol,
-            uri: metadataResponseJSON.metadataUri,
-        };
+//             // Get token balance
+//             const ata = getAssociatedTokenAddressSync(
+//                 mintKeypair.publicKey,
+//                 keypair.publicKey,
+//                 false
+//             );
+//             const balance = await connection.getTokenAccountBalance(ata);
 
-        // Default priority fee for high network load
-        const priorityFee = {
-            unitLimit: 100_000_000,
-            unitPrice: 100_000,
-        };
-        const slippage = "2000";
-        try {
-            // Get private key from settings and create deployer keypair
-            const privateKeyString =
-                runtime.getSetting("SOLANA_PRIVATE_KEY") ??
-                runtime.getSetting("WALLET_PRIVATE_KEY");
-            const secretKey = bs58.decode(privateKeyString);
-            const deployerKeypair = Keypair.fromSecretKey(secretKey) as any;
+//             return {
+//                 success: true,
+//                 txid,
+//                 tokenAddress: mintKeypair.publicKey.toBase58(),
+//                 creator: keypair.publicKey.toBase58(),
+//                 name: tokenMetadata.name,
+//                 symbol: tokenMetadata.symbol,
+//                 balance: balance.value.uiAmount,
+//                 pumpFunUrl: `https://pump.fun/token/${mintKeypair.publicKey.toBase58()}`
+//             };
 
-            // Generate new mint keypair
-            const mintKeypair = Keypair.generate() as any;
-            Logger.log(
-                `Generated mint address: ${mintKeypair.publicKey.toBase58()}`
-            );
+//         } catch (error: any) {
+//             Logger.error("Error during Pump.fun token creation:", error);
+//             return {
+//                 success: false,
+//                 error: error.message
+//             };
+//         }
+//     },
 
-            // Setup connection and SDK
-            const connection = new Connection(settings.SOLANA_RPC_URL!, {
-                commitment: "confirmed",
-                confirmTransactionInitialTimeout: 500000,
-                wsEndpoint: settings.SOLANA_RPC_URL!.replace("https", "wss"),
-            });
-
-            const sdk = new Fomo(connection as any, "devnet", deployerKeypair);
-            // const slippage = runtime.getSetting("SLIPPAGE");
-
-            const createAndBuyConfirmation = await promptConfirmation();
-            if (!createAndBuyConfirmation) {
-                Logger.log("Create and buy token canceled by user");
-                return false;
-            }
-
-            // Convert SOL to lamports (1 SOL = 1_000_000_000 lamports)
-            const lamports = Math.floor(Number(buyAmountSol) * 1_000_000_000);
-
-            Logger.log("Executing create and buy transaction...");
-            const result = await createAndBuyToken({
-                deployer: deployerKeypair as any,
-                mint: mintKeypair as any,
-                tokenMetadata: fullTokenMetadata,
-                buyAmountSol: BigInt(lamports),
-                priorityFee: priorityFee.unitPrice,
-                requiredLiquidity: Number(requiredLiquidity),
-                allowOffCurve: false,
-                fomo: sdk,
-                connection,
-                slippage,
-            });
-
-            if (callback) {
-                if (result.success) {
-                    callback({
-                        text: `Token ${tokenMetadata.name} (${tokenMetadata.symbol}) created successfully!\nURL: https://fomo.fund/token/${result.ca}\nCreator: ${result.creator}\nView at: https://fomo.fund/token/${result.ca}`,
-                        content: {
-                            tokenInfo: {
-                                symbol: tokenMetadata.symbol,
-                                address: result.ca,
-                                creator: result.creator,
-                                name: tokenMetadata.name,
-                                description: tokenMetadata.description,
-                                timestamp: Date.now(),
-                            },
-                        },
-                    });
-                } else {
-                    callback({
-                        text: `Failed to create token: ${result.error}\nAttempted mint address: ${result.ca}`,
-                        content: {
-                            error: result.error,
-                            mintAddress: result.ca,
-                        },
-                    });
-                }
-            }
-            //await trustScoreDb.addToken(tokenInfo);
-            /*
-                // Update runtime state
-                await runtime.updateState({
-                    ...state,
-                    lastCreatedToken: tokenInfo
-                });
-                */
-            // Log success message with token view URL
-            const successMessage = `Token created and purchased successfully! View at: https://fomo.fund/token/${mintKeypair.publicKey.toBase58()}`;
-            Logger.log(successMessage);
-            return result.success;
-        } catch (error: any) {
-            if (callback) {
-                callback({
-                    text: `Error during token creation: ${error.message}`,
-                    content: { error: error.message },
-                });
-            }
-            return false;
-        }
-    },
-
-    examples: [
-        [
-            {
-                user: "{{user1}}",
-                content: {
-                    text: "Create a new token called GLITCHIZA with symbol GLITCHIZA and generate a description about it on fomo.fund. Also come up with a description for it to use for image generation .buy 0.00069 SOL worth.",
-                },
-            },
-            {
-                user: "{{user2}}",
-                content: {
-                    text: "Token GLITCHIZA (GLITCHIZA) created successfully on fomo.fund!\nURL: https://fomo.fund/token/673247855e8012181f941f84\nCreator: Anonymous\nView at: https://fomo.fund/token/673247855e8012181f941f84",
-                    action: "CREATE_AND_BUY_TOKEN",
-                    content: {
-                        tokenInfo: {
-                            symbol: "GLITCHIZA",
-                            address:
-                                "EugPwuZ8oUMWsYHeBGERWvELfLGFmA1taDtmY8uMeX6r",
-                            creator:
-                                "9jW8FPr6BSSsemWPV22UUCzSqkVdTp6HTyPqeqyuBbCa",
-                            name: "GLITCHIZA",
-                            description: "A GLITCHIZA token",
-                        },
-                    },
-                },
-            },
-        ],
-    ] as ActionExample[][],
-} as Action;
+//     examples: [
+//         [
+//             {
+//                 user: "{{user1}}",
+//                 content: {
+//                     text: "Create a new token called GLITCHIZA with symbol GLITCHIZA and generate a description about it on fomo.fund. Also come up with a description for it to use for image generation .buy 0.00069 SOL worth.",
+//                 },
+//             },
+//             {
+//                 user: "{{user2}}",
+//                 content: {
+//                     text: "Token GLITCHIZA (GLITCHIZA) created successfully on fomo.fund!\nURL: https://fomo.fund/token/673247855e8012181f941f84\nCreator: Anonymous\nView at: https://fomo.fund/token/673247855e8012181f941f84",
+//                     action: "CREATE_AND_BUY_TOKEN",
+//                     content: {
+//                         tokenInfo: {
+//                             symbol: "GLITCHIZA",
+//                             address:
+//                                 "EugPwuZ8oUMWsYHeBGERWvELfLGFmA1taDtmY8uMeX6r",
+//                             creator:
+//                                 "9jW8FPr6BSSsemWPV22UUCzSqkVdTp6HTyPqeqyuBbCa",
+//                             name: "GLITCHIZA",
+//                             description: "A GLITCHIZA token",
+//                         },
+//                     },
+//                 },
+//             },
+//         ],
+//     ] as ActionExample[][],
+// } as Action;

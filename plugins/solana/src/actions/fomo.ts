@@ -21,12 +21,20 @@ import {
     type Action,
 } from "@hiveai/utils";
 
-import { walletProvider } from "../providers/wallet";
-
-interface CreateTokenMetadata {
+interface TokenMetadata {
     name: string;
     symbol: string;
+    description: string;
+    image_description: string;
     uri: string;
+}
+
+interface FomoParams {
+    connection: Connection;
+    keypair: Keypair;
+    tokenMetadata: TokenMetadata;
+    buyAmountSol: number;
+    requiredLiquidity?: number;
 }
 
 export interface CreateAndBuyContent extends Content {
@@ -71,7 +79,7 @@ export const createAndBuyToken = async ({
 }: {
     deployer: Keypair;
     mint: Keypair;
-    tokenMetadata: CreateTokenMetadata;
+    tokenMetadata: TokenMetadata;
     buyAmountSol: bigint;
     priorityFee: number;
     requiredLiquidity: number;
@@ -401,213 +409,113 @@ Given the recent messages, extract or generate (come up with if not included) th
 Respond with a JSON markdown block containing only the extracted values.`;
 
 export default {
-    name: "CREATE_AND_BUY_TOKEN",
-    similes: ["CREATE_AND_PURCHASE_TOKEN", "DEPLOY_AND_BUY_TOKEN"],
-    validate: async (_runtime: any, _message: Memory) => {
-        return true; //return isCreateAndBuyContent(runtime, message.content);
-    },
-    description:
-        "Create a new token and buy a specified amount using SOL. Requires deployer private key, token metadata, buy amount in SOL, priority fee, and allowOffCurve flag.",
-    handler: async (
-        runtime: any,
-        message: Memory,
-        state: State,
-        _options: { [key: string]: unknown },
-        callback?: HandlerCallback
-    ): Promise<boolean> => {
-        Logger.log("Starting CREATE_AND_BUY_TOKEN handler...");
+    name: "FOMO",
+    description: "Create and buy a new token on FOMO",
+    similes: ["CREATE_AND_BUY_TOKEN", "DEPLOY_AND_BUY_TOKEN"],
+    validate: async (_runtime: any, _message: any) => true,
 
-        // Compose state if not provided
-        if (!state) {
-            state = (await runtime.composeState(message)) as State;
-        } else {
-            state = await runtime.updateRecentMessageState(state);
-        }
-
-        // Get wallet info for context
-        const walletInfo = await walletProvider.get(runtime, message, state);
-        state.walletInfo = walletInfo;
-
-        // Generate structured content from natural language
-        const pumpContext = composeContext({
-            state,
-            template: fomoTemplate,
-        });
-
-        const content = await generateObject({
-            runtime,
-            context: pumpContext,
-            modelClass: ModelClass.LARGE,
-        });
-
-        // Validate the generated content
-        if (!isCreateAndBuyContentForFomo(content)) {
-            Logger.error(
-                "Invalid content for CREATE_AND_BUY_TOKEN action."
-            );
-            return false;
-        }
-
-        const { tokenMetadata, buyAmountSol, requiredLiquidity } = content;
-        /*
-            // Generate image if tokenMetadata.file is empty or invalid
-            if (!tokenMetadata.file || tokenMetadata.file.length < 100) {  // Basic validation
-                try {
-                    const imageResult = await generateImage({
-                        prompt: `logo for ${tokenMetadata.name} (${tokenMetadata.symbol}) token - ${tokenMetadata.description}`,
-                        width: 512,
-                        height: 512,
-                        count: 1
-                    }, runtime);
-
-                    if (imageResult.success && imageResult.data && imageResult.data.length > 0) {
-                        // Remove the "data:image/png;base64," prefix if present
-                        tokenMetadata.file = imageResult.data[0].replace(/^data:image\/[a-z]+;base64,/, '');
-                    } else {
-                        Logger.error("Failed to generate image:", imageResult.error);
-                        return false;
-                    }
-                } catch (error) {
-                    Logger.error("Error generating image:", error);
-                    return false;
-                }
-            } */
-
-        // const imageResult = await generateImage(
-        //     {
-        //         prompt: `logo for ${tokenMetadata.name} (${tokenMetadata.symbol}) token - ${tokenMetadata.description}`,
-        //         width: 256,
-        //         height: 256,
-        //         count: 1,
-        //     },
-        //     runtime
-        // );
-
-        // const imageBuffer = Buffer.from(imageResult.data[0], "base64");
-        // const formData = new FormData();
-        // const blob = new Blob([imageBuffer], { type: "image/png" });
-        // formData.append("file", blob, `${tokenMetadata.name}.png`);
-        // formData.append("name", tokenMetadata.name);
-        // formData.append("symbol", tokenMetadata.symbol);
-        // formData.append("description", tokenMetadata.description);
-
-        // // FIXME: does fomo.fund have an ipfs call?
-        // const metadataResponse = await fetch("https://pump.fun/api/ipfs", {
-        //     method: "POST",
-        //     body: formData,
-        // });
-        // const metadataResponseJSON = (await metadataResponse.json()) as {
-        //     name: string;
-        //     symbol: string;
-        //     metadataUri: string;
-        // };
-        // // Add the default decimals and convert file to Blob
-        const fullTokenMetadata: CreateTokenMetadata = {
-            name: tokenMetadata.name,
-            symbol: tokenMetadata.symbol,
-            uri: "",
-        };
-
-
-
-        // Default priority fee for high network load
-        const priorityFee = {
-            unitLimit: 100_000_000,
-            unitPrice: 100_000,
-        };
-        const slippage = "2000";
+    async handler({
+        connection,
+        keypair,
+        tokenMetadata,
+        buyAmountSol,
+        requiredLiquidity = 85
+    }: FomoParams): Promise<any> {
         try {
-            // Get private key from settings and create deployer keypair
-            const privateKeyString =
-                runtime.getSetting("SOLANA_PRIVATE_KEY") ??
-                runtime.getSetting("WALLET_PRIVATE_KEY");
-            const secretKey = bs58.decode(privateKeyString);
-            const deployerKeypair = Keypair.fromSecretKey(secretKey);
+            Logger.info("Starting FOMO token creation...");
 
-            // Generate new mint keypair
+            // Initialize FOMO SDK with mainnet cluster
+            const fomo = new Fomo(connection, "mainnet-beta", keypair);
+
+            // Generate mint keypair for the new token
             const mintKeypair = Keypair.generate();
-            Logger.log(
-                `Generated mint address: ${mintKeypair.publicKey.toBase58()}`
+            Logger.info(`Generated mint address: ${mintKeypair.publicKey.toBase58()}`);
+
+            // Create metadata URI using FOMO's API
+            const formData = new FormData();
+            formData.append("name", tokenMetadata.name);
+            formData.append("symbol", tokenMetadata.symbol);
+            formData.append("description", tokenMetadata.description);
+
+            const metadataResponse = await fetch("https://fomo.fund/api/ipfs", {
+                method: "POST",
+                body: formData,
+            });
+
+            const metadataResponseJSON = await metadataResponse.json();
+            if (!metadataResponseJSON.metadataUri) {
+                throw new Error("Failed to create token metadata");
+            }
+
+            // Convert SOL to lamports
+            const lamports = BigInt(Math.floor(buyAmountSol * 1e9));
+
+            // Get transaction from FOMO SDK
+            const { transaction: versionedTx } = await fomo.createToken(
+                keypair.publicKey,
+                tokenMetadata.name,
+                tokenMetadata.symbol,
+                metadataResponseJSON.metadataUri,
+                100_000, // priority fee
+                bs58.encode(mintKeypair.secretKey),
+                requiredLiquidity,
+                Number(lamports) / 1e9
             );
 
-            // Setup connection and SDK
-            const connection = new Connection(settings.SOLANA_RPC_URL!, {
-                commitment: "confirmed",
-                confirmTransactionInitialTimeout: 500000, // 120 seconds
-                wsEndpoint: settings.SOLANA_RPC_URL!.replace("https", "wss"),
+            // Get latest blockhash
+            const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
+            versionedTx.message.recentBlockhash = blockhash;
+
+            // Sign transaction with mint keypair
+            versionedTx.sign([mintKeypair]);
+
+            // Send transaction
+            const txid = await connection.sendTransaction(versionedTx, {
+                skipPreflight: false,
+                maxRetries: 3,
+                preflightCommitment: "confirmed"
             });
 
-            const sdk = new Fomo(connection, "devnet", deployerKeypair);
-            // const slippage = runtime.getSetting("SLIPPAGE");
+            Logger.info("Transaction sent:", txid);
 
-            const createAndBuyConfirmation = await promptConfirmation();
-            if (!createAndBuyConfirmation) {
-                Logger.log("Create and buy token canceled by user");
-                return false;
+            // Confirm transaction
+            const confirmation = await connection.confirmTransaction({
+                signature: txid,
+                blockhash,
+                lastValidBlockHeight
+            }, "confirmed");
+
+            if (confirmation.value.err) {
+                throw new Error(`Transaction failed: ${confirmation.value.err}`);
             }
 
-            // Convert SOL to lamports (1 SOL = 1_000_000_000 lamports)
-            const lamports = Math.floor(Number(buyAmountSol) * 1_000_000_000);
+            Logger.info("Token creation completed successfully!");
 
-            Logger.log("Executing create and buy transaction...");
-            const result = await createAndBuyToken({
-                deployer: deployerKeypair,
-                mint: mintKeypair,
-                tokenMetadata: fullTokenMetadata,
-                buyAmountSol: BigInt(lamports),
-                priorityFee: priorityFee.unitPrice,
-                requiredLiquidity: Number(requiredLiquidity),
-                allowOffCurve: false,
-                fomo: sdk,
-                connection,
-                slippage,
-            });
+            // Get token balance
+            const ata = getAssociatedTokenAddressSync(
+                mintKeypair.publicKey,
+                keypair.publicKey,
+                false
+            );
+            const balance = await connection.getTokenAccountBalance(ata);
 
-            if (callback) {
-                if (result.success) {
-                    callback({
-                        text: `Token ${tokenMetadata.name} (${tokenMetadata.symbol}) created successfully!\nURL: https://fomo.fund/token/${result.ca}\nCreator: ${result.creator}\nView at: https://fomo.fund/token/${result.ca}`,
-                        content: {
-                            tokenInfo: {
-                                symbol: tokenMetadata.symbol,
-                                address: result.ca,
-                                creator: result.creator,
-                                name: tokenMetadata.name,
-                                description: tokenMetadata.description,
-                                timestamp: Date.now(),
-                            },
-                        },
-                    });
-                } else {
-                    callback({
-                        text: `Failed to create token: ${result.error}\nAttempted mint address: ${result.ca}`,
-                        content: {
-                            error: result.error,
-                            mintAddress: result.ca,
-                        },
-                    });
-                }
-            }
-            //await trustScoreDb.addToken(tokenInfo);
-            /*
-                // Update runtime state
-                await runtime.updateState({
-                    ...state,
-                    lastCreatedToken: tokenInfo
-                });
-                */
-            // Log success message with token view URL
-            const successMessage = `Token created and purchased successfully! View at: https://fomo.fund/token/${mintKeypair.publicKey.toBase58()}`;
-            Logger.log(successMessage);
-            return result.success;
+            return {
+                success: true,
+                txid,
+                tokenAddress: mintKeypair.publicKey.toBase58(),
+                creator: keypair.publicKey.toBase58(),
+                name: tokenMetadata.name,
+                symbol: tokenMetadata.symbol,
+                balance: balance.value.uiAmount,
+                fomoUrl: `https://fomo.fund/token/${mintKeypair.publicKey.toBase58()}`
+            };
+
         } catch (error: any) {
-            if (callback) {
-                callback({
-                    text: `Error during token creation: ${error.message}`,
-                    content: { error: error.message },
-                });
-            }
-            return false;
+            Logger.error("Error during FOMO token creation:", error);
+            return {
+                success: false,
+                error: error.message
+            };
         }
     },
 
