@@ -17,10 +17,10 @@ import {
 } from "@hiveai/utils";
 
 export interface TokenMetadata {
-    name: string;
-    symbol: string;
-    description: string;
-    image_description: string;
+        name: string;
+        symbol: string;
+        description: string;
+        image_description: string;
     uri?: string;
 }
 
@@ -161,8 +161,8 @@ const createAndBuyToken = async ({
     Logger.log("Transaction sent:", txid);
 
     const confirmation = await connection.confirmTransaction({
-        signature: txid,
-        blockhash: blockhash,
+            signature: txid,
+            blockhash: blockhash,
         lastValidBlockHeight: lastValidBlockHeight
     });
 
@@ -241,8 +241,8 @@ const buyToken = async ({
     Logger.log("Transaction sent:", txid);
 
     const confirmation = await connection.confirmTransaction({
-        signature: txid,
-        blockhash: blockhash,
+            signature: txid,
+            blockhash: blockhash,
         lastValidBlockHeight: lastValidBlockHeight
     });
 
@@ -310,8 +310,8 @@ const sellToken = async ({
     Logger.log("Transaction sent:", txid);
 
     const confirmation = await connection.confirmTransaction({
-        signature: txid,
-        blockhash: blockhash,
+            signature: txid,
+            blockhash: blockhash,
         lastValidBlockHeight: lastValidBlockHeight
     });
 

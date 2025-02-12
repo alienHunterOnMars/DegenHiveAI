@@ -14,24 +14,29 @@
             }
         }
     },
-    "files": ["dist"],
+    "files": [
+        "dist"
+    ],
     "scripts": {
-		"build": "tsup",
-		"dev": "tsup --watch",
-		"test": "vitest run",
-		"test:coverage": "vitest run --coverage"
+        "build": "tsup",
+        "dev": "tsup --watch",
+        "test": "vitest run",
+        "test:coverage": "vitest run --coverage"
     },
     "dependencies": {
-        "@hiveai/utils": "workspace:*",
         "@hiveai/messaging": "workspace:*",
+        "@hiveai/utils": "workspace:*",
+        "events": "^3.3.0",
+        "ioredis": "^5.5.0",
         "node-telegram-bot-api": "^0.64.0",
         "telegraf": "^4.15.3",
-        "events": "^3.3.0"
+        "uuid": "^11.0.5"
     },
     "devDependencies": {
-        "@types/node": "^20.0.0",
         "@types/events": "^3.0.3",
+        "@types/node": "^20.0.0",
+        "@types/uuid": "^10.0.0",
         "tsup": "8.3.5",
         "typescript": "^5.0.0"
     }
-} 
+}

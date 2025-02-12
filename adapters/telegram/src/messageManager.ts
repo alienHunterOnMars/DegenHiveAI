@@ -8,11 +8,12 @@
  * - Managing RAG memory updates for user context.
  */
 import { Context, Telegraf } from "telegraf";
-import { Logger } from "@hiveai/utils";
+import { Logger, RedisClient, REDIS_CHANNELS } from "@hiveai/utils";
 import { IUserManager } from "./userManager";
 import { ITradeManager, TradeOrder } from "./tradeManager";
 import { IRLManager } from "./rlManager";
 import { IMemoryManager } from "./memoryManager";
+import { v4 as uuid } from 'uuid';
 
 interface MessageManagerOptions {
   bot: Telegraf<Context>;
@@ -26,11 +27,11 @@ export class MessageManager {
   constructor(private options: MessageManagerOptions) {}
 
   // Main entry: process incoming message
-  public async handleMessage(ctx: Context): Promise<void> {
+  public async handleMessage(ctx: Context, redisClient: RedisClient): Promise<void> {
     try {
       Logger.info("handleMessage");
       Logger.info(ctx);
-      
+
       const messageText = ctx.message?.text;
       if (!messageText) return; // ignore non-text messages for now
 
@@ -40,8 +41,23 @@ export class MessageManager {
       // Check if this is the user's first interaction
       if (await this.options.userManager.isFirstTime(telegramUserId)) {
         await this.sendWelcomeMessage(ctx);
-        return;
+        // return;
       }
+
+      if (!ctx.chat) return;
+
+      await redisClient.publish(REDIS_CHANNELS.SOCIAL_INBOUND, {
+        id: uuid(),
+        timestamp: Date.now(),
+        type: 'SOCIAL',
+        source: 'telegram',
+        payload: {
+          chatId: ctx.chat.id,
+          text: messageText,
+          userId: ctx.from?.id,
+          messageId: ctx.message?.message_id
+        }
+      });
 
       // Update contextual memory (RAG) for the chat
       await this.options.memoryManager.updateMemory(telegramUserId, messageText);

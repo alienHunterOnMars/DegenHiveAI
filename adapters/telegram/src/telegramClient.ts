@@ -4,7 +4,7 @@
  * and handles graceful shutdown.
  */
 import { Telegraf, Context } from "telegraf";
-import { Logger } from "@hiveai/utils";
+import { Logger, RedisClient, RedisMessage, REDIS_CHANNELS } from '@hiveai/utils';
 import { UserManager } from "./userManager";
 import { TradeManager } from "./tradeManager";
 import { RLManager } from "./rlManager";
@@ -15,10 +15,13 @@ export interface TelegramClientOptions {
     token: string;
     founderChatId: string;
     groupChatId: string;
+    redis_url: string;
 }
 
 export class TelegramClient {
     private bot: Telegraf;
+    private redisClient: RedisClient;
+
     private messageManager: MessageManager;
     private userManager: UserManager;
     private tradeManager: TradeManager;
@@ -28,6 +31,7 @@ export class TelegramClient {
     constructor(config: TelegramClientOptions) {
 
       this.bot = new Telegraf(config.token);
+      this.redisClient = new RedisClient({ url: config.redis_url });
         
         // Initialize managers
         this.userManager = new UserManager();
@@ -47,16 +51,30 @@ export class TelegramClient {
     }
 
     private setupHandlers() {
-        this.bot.on('message', (ctx) => this.messageManager.handleMessage(ctx));
+        this.bot.on('message', (ctx) => this.messageManager.handleMessage(ctx, this.redisClient));
     }
 
     async start(): Promise<void> {
         await this.bot.launch();
+
+        // Subscribe to outbound messages from other processes
+        await this.redisClient.subscribe( REDIS_CHANNELS.SOCIAL_OUTBOUND, 
+              async (message: RedisMessage) => {
+                if (message.source === 'telegram') {
+                  await this.sendMessage(
+                    message.payload.chatId,
+                    message.payload.text,
+                    message.payload.options
+                  );
+                }
+        });        
+
         Logger.info('Telegram client started');
     }
 
     async stop(): Promise<void> {
         await this.bot.stop();
+        await this.redisClient.disconnect();
         Logger.info('Telegram client stopped');
     }
 

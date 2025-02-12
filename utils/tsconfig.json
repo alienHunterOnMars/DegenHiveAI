@@ -28,7 +28,8 @@
         "src/context.ts",
         "src/embedding.ts",
         "src/localembeddingManager.ts",
-        "src/memory.ts"
+        "src/memory.ts",
+        "src/redis.ts"
     ],
     "include": ["src/**/*.ts"],
     "exclude": ["node_modules", "dist"]
