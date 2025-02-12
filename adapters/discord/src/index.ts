@@ -138,6 +138,14 @@ export class DiscordAdapter extends EventEmitter {
                 });
             });
 
+            // Subscribe to outbound messages from other processes
+            await this.redisClient.subscribe( REDIS_CHANNELS.SOCIAL_OUTBOUND, 
+                async (message: RedisMessage) => {
+                if (message.source === 'discord') {
+                    await this.handleIncomingRedisMessage(message);
+                }
+        });  
+
             this.setupEventListeners();
 
             Logger.info("Discord adapter initialization complete");
@@ -150,6 +158,11 @@ export class DiscordAdapter extends EventEmitter {
 
     async makeAnnouncement(content: string, options?: { pingRole?: string }): Promise<void> {
         await this.announcementHandler.makeAnnouncement(content, options);
+    }
+
+    async handleIncomingRedisMessage(message: any): Promise<void> {
+        Logger.info("Discord Adapter :: handleIncomingRedisMessage");
+        Logger.info(message);
     }
 
     async sendMessage(channelId: string, content: string): Promise<void> {

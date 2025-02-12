@@ -27,15 +27,15 @@ export async function startDiscord() {
         });
 
         await adapter.start();
-        Logger.info('Telegram process started successfully');
+        Logger.info('Discord process started successfully');
     } catch (error) {
-        Logger.error('Failed to start Telegram process:', error);
+        Logger.error('Failed to start Discord process:', error);
         process.exit(1);
     }
 }
  
 
 startDiscord().catch(error => {
-    Logger.error('Unhandled error in Telegram process:', error);
+    Logger.error('Unhandled error in Discord process:', error);
     process.exit(1);
 });

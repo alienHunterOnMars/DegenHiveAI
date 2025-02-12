@@ -14,6 +14,8 @@ import { DEFAULT_MAX_TWEET_LENGTH } from "./environment";
 import type { State } from "./types";
 import type { ActionResponse } from "./types";
 import { MediaData } from "./types";
+import { EventEmitter } from 'events';
+import { SearchMode } from 'agent-twitter-client';
 
 const MAX_TIMELINES_TO_FETCH = 15;
 
@@ -80,7 +82,7 @@ interface PendingTweet {
 
 type PendingTweetApprovalStatus = "PENDING" | "APPROVED" | "REJECTED";
 
-export class TwitterPostClient {
+export class TwitterPostClient extends EventEmitter {
     client: ClientBase;
     runtime: any;
     twitterUsername: string;
@@ -93,10 +95,11 @@ export class TwitterPostClient {
     private approvalCheckInterval: number | undefined;
 
     constructor(client: ClientBase, runtime: any) {
+        super();
         this.client = client;
         this.runtime = runtime;
-        this.twitterUsername = this.client.twitterConfig.TWITTER_USERNAME;
-        this.isDryRun = this.client.twitterConfig.TWITTER_DRY_RUN;
+        this.twitterUsername = client.twitterConfig.TWITTER_USERNAME;
+        this.isDryRun = client.twitterConfig.TWITTER_DRY_RUN;
 
         // Log configuration on initialization
         Logger.log("Twitter Client Configuration:");
@@ -167,76 +170,41 @@ export class TwitterPostClient {
             await this.client.init();
         }
 
-        const generateNewTweetLoop = async () => {
-            const lastPost = await (this.runtime as any).cacheManager.get(
-                "twitter/" + this.twitterUsername + "/lastPost"
-            ) as { timestamp: number } | null;
+        // Start monitoring for mentions and replies
+        this.startMonitoring();
+    }
 
-            const lastPostTimestamp = lastPost?.timestamp ?? 0;
-            const minMinutes = this.client.twitterConfig.POST_INTERVAL_MIN;
-            const maxMinutes = this.client.twitterConfig.POST_INTERVAL_MAX;
-            const randomMinutes =
-                Math.floor(Math.random() * (maxMinutes - minMinutes + 1)) +
-                minMinutes;
-            const delay = randomMinutes * 60 * 1000;
-
-            if (Date.now() > lastPostTimestamp + delay) {
-                await this.generateNewTweet();
-            }
-
-            setTimeout(() => {
-                generateNewTweetLoop(); // Set up next iteration
-            }, delay);
-
-            Logger.log(`Next tweet scheduled in ${randomMinutes} minutes`);
-        };
-
-        const processActionsLoop = async () => {
-            const actionInterval = this.client.twitterConfig.ACTION_INTERVAL; // Defaults to 5 minutes
-
-            while (!this.stopProcessingActions) {
-                try {
-                    const results = await this.processTweetActions();
-                    if (results) {
-                        Logger.log(`Processed ${results.length} tweets`);
-                        Logger.log(
-                            `Next action processing scheduled in ${actionInterval} minutes`
-                        );
-                        // Wait for the full interval before next processing
-                        await new Promise(
-                            (resolve) =>
-                                setTimeout(resolve, actionInterval * 60 * 1000) // now in minutes
-                        );
-                    }
-                } catch (error) {
-                    Logger.error(
-                        "Error in action processing loop:",
-                        error
-                    );
-                    // Add exponential backoff on error
-                    await new Promise((resolve) => setTimeout(resolve, 30000)); // Wait 30s on error
-                }
-            }
-        };
-
-        if (this.client.twitterConfig.POST_IMMEDIATELY) {
-            await this.generateNewTweet();
-        }
-
-        generateNewTweetLoop();
-        Logger.log("Tweet generation loop started");
-
-        if (this.client.twitterConfig.ENABLE_ACTION_PROCESSING) {
-            processActionsLoop().catch((error) => {
-                Logger.error(
-                    "Fatal error in process actions loop:",
-                    error
+    private async startMonitoring() {
+        const checkInterval = this.client.twitterConfig.TWITTER_POLL_INTERVAL * 1000;
+        
+        const monitorLoop = async () => {
+            try {
+                const mentions = await this.client.fetchSearchTweets(
+                    `@${this.twitterUsername}`,
+                    20,
+                    SearchMode.Latest
                 );
-            });
-        }
 
-        // Start the pending tweet check loop if enabled
-        if (this.approvalRequired) this.runPendingTweetCheckLoop();
+                for (const mention of mentions.tweets) {
+                    if (mention.username !== this.twitterUsername) {
+                        this.emit('mention', mention);
+                    }
+                }
+
+                const timeline = await this.client.fetchHomeTimeline(20);
+                for (const tweet of timeline) {
+                    if (tweet.inReplyToStatusId && tweet.username !== this.twitterUsername) {
+                        this.emit('reply', tweet);
+                    }
+                }
+            } catch (error) {
+                Logger.error('Error monitoring Twitter:', error);
+            }
+
+            setTimeout(monitorLoop, checkInterval);
+        };
+
+        monitorLoop();
     }
 
     private runPendingTweetCheckLoop() {
@@ -1192,6 +1160,9 @@ export class TwitterPostClient {
 
     async stop() {
         this.stopProcessingActions = true;
+        if (this.approvalCheckInterval) {
+            clearInterval(this.approvalCheckInterval);
+        }
     }
 
     private async sendForApproval(
@@ -1220,16 +1191,6 @@ export class TwitterPostClient {
                 },
                 timestamp: new Date().toISOString(),
             };
-
-            // const channel = await (this.discordClientForApproval as any).channels.fetch(
-            //     this.discordApprovalChannelId || ""
-            // );
-
-            // if (!channel || !(channel instanceof TextChannel)) {
-            //     throw new Error("Invalid approval channel");
-            // }
-
-            // const message = await channel.send({ embeds: [embed] });
 
             // Store the pending tweet
             const pendingTweetsKey = `twitter/${this.client.profile?.username || ""}/pendingTweet`;
@@ -1326,18 +1287,20 @@ export class TwitterPostClient {
                 pendingTweetsKey
             ) as PendingTweet[] | null) || [];
 
-        // Remove the specific tweet
-        const updatedPendingTweets = currentPendingTweets.filter(
-            (tweet: any) => tweet.discordMessageId !== discordMessageId
-        );
-
-        if (updatedPendingTweets.length === 0) {
-            await this.runtime.cacheManager.delete(pendingTweetsKey);
-        } else {
-            await this.runtime.cacheManager.set(
-                pendingTweetsKey,
-                updatedPendingTweets
+        if (currentPendingTweets) {
+            // Remove the specific tweet
+            const updatedPendingTweets = currentPendingTweets.filter(
+                (tweet: any) => tweet.discordMessageId !== discordMessageId
             );
+
+            if (updatedPendingTweets.length === 0) {
+                await this.runtime.cacheManager.delete(pendingTweetsKey);
+            } else {
+                await this.runtime.cacheManager.set(
+                    pendingTweetsKey,
+                    updatedPendingTweets
+                );
+            }
         }
     }
 
@@ -1349,100 +1312,102 @@ export class TwitterPostClient {
                 pendingTweetsKey
             ) as PendingTweet[] | null) || [];
 
-        for (const pendingTweet of pendingTweets) {
-            // Check if tweet is older than 24 hours
-            const isExpired =
-                Date.now() - pendingTweet.timestamp > 24 * 60 * 60 * 1000;
+        if (pendingTweets) {
+            for (const pendingTweet of pendingTweets) {
+                // Check if tweet is older than 24 hours
+                const isExpired =
+                    Date.now() - pendingTweet.timestamp > 24 * 60 * 60 * 1000;
 
-            if (isExpired) {
-                Logger.log("Pending tweet expired, cleaning up");
+                if (isExpired) {
+                    Logger.log("Pending tweet expired, cleaning up");
 
-                // Notify on Discord about expiration
-                // try {
-                //     const channel =
-                //         await (this.discordClientForApproval as any).channels.fetch(
-                //             pendingTweet.channelId
-                //         );
-                //     if (channel instanceof TextChannel) {
-                //         const originalMessage = await channel.messages.fetch(
-                //             pendingTweet.discordMessageId
-                //         );
-                //         await originalMessage.reply(
-                //             "This tweet approval request has expired (24h timeout)."
-                //         );
-                //     }
-                // } catch (error) {
-                //     Logger.error(
-                //         "Error sending expiration notification:",
-                //         error
-                //     );
-                // }
+                    // Notify on Discord about expiration
+                    // try {
+                    //     const channel =
+                    //         await (this.discordClientForApproval as any).channels.fetch(
+                    //             pendingTweet.channelId
+                    //         );
+                    //     if (channel instanceof TextChannel) {
+                    //         const originalMessage = await channel.messages.fetch(
+                    //             pendingTweet.discordMessageId
+                    //         );
+                    //         await originalMessage.reply(
+                    //             "This tweet approval request has expired (24h timeout)."
+                    //         );
+                    //     }
+                    // } catch (error) {
+                    //     Logger.error(
+                    //         "Error sending expiration notification:",
+                    //         error
+                    //     );
+                    // }
 
-                await this.cleanupPendingTweet(pendingTweet.discordMessageId);
-                return;
-            }
+                    await this.cleanupPendingTweet(pendingTweet.discordMessageId);
+                    return;
+                }
 
-            // Check approval status
-            Logger.log("Checking approval status...");
-            const approvalStatus: PendingTweetApprovalStatus =
-                await this.checkApprovalStatus(pendingTweet.discordMessageId);
+                // Check approval status
+                Logger.log("Checking approval status...");
+                const approvalStatus: PendingTweetApprovalStatus =
+                    await this.checkApprovalStatus(pendingTweet.discordMessageId);
 
-            if (approvalStatus === "APPROVED") {
-                Logger.log("Tweet Approved, Posting");
-                await this.postTweet(
-                    this.runtime,
-                    this.client,
-                    pendingTweet.tweetTextForPosting,
-                    pendingTweet.roomId,
-                    pendingTweet.rawTweetContent,
-                    this.twitterUsername
-                );
+                if (approvalStatus === "APPROVED") {
+                    Logger.log("Tweet Approved, Posting");
+                    await this.postTweet(
+                        this.runtime,
+                        this.client,
+                        pendingTweet.tweetTextForPosting,
+                        pendingTweet.roomId,
+                        pendingTweet.rawTweetContent,
+                        this.twitterUsername
+                    );
 
-                // Notify on Discord about posting
-                // try {
-                //     const channel =
-                //         await (this.discordClientForApproval as any).channels.fetch(
-                //             pendingTweet.channelId
-                //         );
-                //     if (channel instanceof TextChannel) {
-                //         const originalMessage = await channel.messages.fetch(
-                //             pendingTweet.discordMessageId
-                //         );
-                //         await originalMessage.reply(
-                //             "Tweet has been posted successfully! ✅"
-                //         );
-                //     }
-                // } catch (error) {
-                //     Logger.error(
-                //         "Error sending post notification:",
-                //         error
-                //     );
-                // }
+                    // Notify on Discord about posting
+                    // try {
+                    //     const channel =
+                    //         await (this.discordClientForApproval as any).channels.fetch(
+                    //             pendingTweet.channelId
+                    //         );
+                    //     if (channel instanceof TextChannel) {
+                    //         const originalMessage = await channel.messages.fetch(
+                    //             pendingTweet.discordMessageId
+                    //         );
+                    //         await originalMessage.reply(
+                    //             "Tweet has been posted successfully! ✅"
+                    //         );
+                    //     }
+                    // } catch (error) {
+                    //     Logger.error(
+                    //         "Error sending post notification:",
+                    //         error
+                    //     );
+                    // }
 
-                await this.cleanupPendingTweet(pendingTweet.discordMessageId);
-            } else if (approvalStatus === "REJECTED") {
-                Logger.log("Tweet Rejected, Cleaning Up");
-                await this.cleanupPendingTweet(pendingTweet.discordMessageId);
-                // Notify about Rejection of Tweet
-                // try {
-                //     const channel =
-                //         await (this.discordClientForApproval as any).channels.fetch(
-                //             pendingTweet.channelId
-                //         );
-                //     if (channel instanceof TextChannel) {
-                //         const originalMessage = await channel.messages.fetch(
-                //             pendingTweet.discordMessageId
-                //         );
-                //         await originalMessage.reply(
-                //             "Tweet has been rejected! ❌"
-                //         );
-                //     }
-                // } catch (error) {
-                //     Logger.error(
-                //         "Error sending rejection notification:",
-                //         error
-                //     );
-                // }
+                    await this.cleanupPendingTweet(pendingTweet.discordMessageId);
+                } else if (approvalStatus === "REJECTED") {
+                    Logger.log("Tweet Rejected, Cleaning Up");
+                    await this.cleanupPendingTweet(pendingTweet.discordMessageId);
+                    // Notify about Rejection of Tweet
+                    // try {
+                    //     const channel =
+                    //         await (this.discordClientForApproval as any).channels.fetch(
+                    //             pendingTweet.channelId
+                    //         );
+                    //     if (channel instanceof TextChannel) {
+                    //         const originalMessage = await channel.messages.fetch(
+                    //             pendingTweet.discordMessageId
+                    //         );
+                    //         await originalMessage.reply(
+                    //             "Tweet has been rejected! ❌"
+                    //         );
+                    //     }
+                    // } catch (error) {
+                    //     Logger.error(
+                    //         "Error sending rejection notification:",
+                    //         error
+                    //     );
+                    // }
+                }
             }
         }
     }

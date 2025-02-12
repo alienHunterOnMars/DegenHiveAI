@@ -5,8 +5,11 @@ import { TwitterPostClient } from "./post";
 import { TwitterSearchClient } from "./search";
 import { TwitterSpaceClient } from "./spaces";
 import { EventEmitter } from 'events';
-import { Logger } from '@hiveai/utils';
-import { MessageBroker, CrossClientMessage } from '@hiveai/messaging';
+import { Logger, REDIS_CHANNELS, RedisClient, RedisMessage } from '@hiveai/utils';
+import { Tweet } from 'agent-twitter-client';
+import { v4 as uuid } from 'uuid';
+
+export *  from "./types";
 
 /**
  * A manager that orchestrates all specialized Twitter logic:
@@ -18,16 +21,17 @@ import { MessageBroker, CrossClientMessage } from '@hiveai/messaging';
  */
 class TwitterManager {
     client: ClientBase;
+
     post: TwitterPostClient;
     search?: TwitterSearchClient;
-    interaction: TwitterInteractionClient;
     space?: TwitterSpaceClient;
-    private messageBroker?: MessageBroker;
-
+    interaction: TwitterInteractionClient;
+    
+    
     constructor(runtime: any, twitterConfig: TwitterConfig) {
         // Pass twitterConfig to the base client
         this.client = new ClientBase(runtime, twitterConfig);
-
+ 
         // Posting logic
         this.post = new TwitterPostClient(this.client, runtime);
 
@@ -48,68 +52,7 @@ class TwitterManager {
         if (twitterConfig.TWITTER_SPACES_ENABLE) {
             this.space = new TwitterSpaceClient(this.client, runtime);
         }
-
-        // Initialize RabbitMQ if config provided
-        if (twitterConfig.messageBroker) {
-            this.messageBroker = new MessageBroker({
-                url: twitterConfig.messageBroker.url,
-                exchange: twitterConfig.messageBroker.exchange,
-                clientId: 'twitter'
-            });
-            this.setupMessageBroker();
-        }
-    }
-
-    private setupMessageBroker(): void {
-        if (!this.messageBroker) return;
-        (this.messageBroker as any).subscribe('message', this.handleCrossClientMessage.bind(this));
-    }
-
-    private async handleCrossClientMessage(message: CrossClientMessage): Promise<void> {
-        if (!this.messageBroker) return;
-
-        try {
-            switch (message.type) {
-                case 'MESSAGE':
-                    await this.handleIncomingMessage(message);
-                    break;
-                case 'ALERT':
-                    await this.handleAlert(message);
-                    break;
-                case 'NOTIFICATION':
-                    await this.handleNotification(message);
-                    break;
-                case 'COMMAND':
-                    await this.handleCommand(message);
-                    break;
-            }
-        } catch (error) {
-            Logger.error('Error handling cross-client message:', error);
-        }
-    }
-
-    private async handleIncomingMessage(message: CrossClientMessage): Promise<void> {
-        // Optionally create tweets from cross-platform messages
-        if (message.payload.content && this.shouldTweet(message)) {
-            await (this.client as any).tweet(message.payload.content);
-        }
-    }
-
-    private shouldTweet(message: CrossClientMessage): boolean {
-        // Implement logic to determine if a cross-platform message should be tweeted
-        return false;
-    }
-
-    private async handleAlert(message: CrossClientMessage): Promise<void> {
-        // Handle platform-wide alerts
-    }
-
-    private async handleNotification(message: CrossClientMessage): Promise<void> {
-        // Handle cross-platform notifications
-    }
-
-    private async handleCommand(message: CrossClientMessage): Promise<void> {
-        // Handle cross-platform commands
+ 
     }
 }
 
@@ -151,87 +94,108 @@ export const TwitterClientInterface: any = {
 
 export default TwitterClientInterface;
 
+
+/// Twitter Adapter
+/// ==============================
 export class TwitterAdapter extends EventEmitter {
     private client: TwitterPostClient;
-    private messageBroker?: MessageBroker;
-    private readonly config: any;
+    private redisClient: RedisClient;
+    private readonly config: TwitterConfig;
 
     constructor(config: TwitterConfig) {
         super();
-        this.config  = config;
+        this.config = config;
         this.client = new TwitterPostClient((config as any), null);
+        this.redisClient = new RedisClient({ url: config.REDIS_URL });
+    }
 
-        // Initialize RabbitMQ if config provided
-        if (config.messageBroker) {
-            this.messageBroker = new MessageBroker({
-                url: config.messageBroker.url,
-                exchange: config.messageBroker.exchange,
-                clientId: 'twitter'
+    private async handleMention(tweet: Tweet): Promise<void> {
+        try {
+            await this.redisClient.publish(REDIS_CHANNELS.SOCIAL_INBOUND, {
+                id: uuid(),
+                timestamp: Date.now(),
+                type: 'SOCIAL',
+                source: 'twitter',
+                payload: {
+                    tweetId: tweet.id,
+                    text: tweet.text,
+                    userId: tweet.userId,
+                    username: tweet.username,
+                    inReplyToId: tweet.inReplyToStatusId,
+                    type: 'mention'
+                }
             });
-            this.setupMessageBroker();
+            Logger.info('Published mention to Redis:', tweet.id);
+        } catch (error) {
+            Logger.error('Error publishing mention to Redis:', error);
         }
     }
 
-    private setupMessageBroker(): void {
-        if (!this.messageBroker) return;
-        (this.messageBroker as any).subscribe('message', this.handleCrossClientMessage.bind(this));
+    private async handleReply(tweet: Tweet): Promise<void> {
+        try {
+            await this.redisClient.publish(REDIS_CHANNELS.SOCIAL_INBOUND, {
+                id: uuid(),
+                timestamp: Date.now(),
+                type: 'SOCIAL',
+                source: 'twitter',
+                payload: {
+                    tweetId: tweet.id,
+                    text: tweet.text,
+                    userId: tweet.userId,
+                    username: tweet.username,
+                    inReplyToId: tweet.inReplyToStatusId,
+                    type: 'reply'
+                }
+            });
+            Logger.info('Published reply to Redis:', tweet.id);
+        } catch (error) {
+            Logger.error('Error publishing reply to Redis:', error);
+        }
     }
 
-    private async handleCrossClientMessage(message: CrossClientMessage): Promise<void> {
-        if (!this.messageBroker) return;
-
+    private async handleIncomingRedisMessage(message: RedisMessage): Promise<void> {
         try {
-            switch (message.type) {
-                case 'MESSAGE':
-                    await this.handleIncomingMessage(message);
+            Logger.info("Twitter Adapter :: handleIncomingRedisMessage", message);
+
+            if (message.type !== 'SOCIAL' || !message.payload) {
+                return;
+            }
+
+            switch (message.payload.type) {
+                case 'tweet':
+                    await this.client.sendStandardTweet(message.payload.text, '');
                     break;
-                case 'ALERT':
-                    await this.handleAlert(message);
+                case 'reply':
+                    if (message.payload.inReplyToId) {
+                        await this.client.sendStandardTweet(message.payload.text, message.payload.inReplyToId);
+                    }
                     break;
-                case 'NOTIFICATION':
-                    await this.handleNotification(message);
-                    break;
-                case 'COMMAND':
-                    await this.handleCommand(message);
-                    break;
+                default:
+                    Logger.warn('Unknown message type:', message.payload.type);
             }
         } catch (error) {
-            Logger.error('Error handling cross-client message:', error);
+            Logger.error('Error handling Redis message:', error);
         }
-    }
-
-    private async handleIncomingMessage(message: CrossClientMessage): Promise<void> {
-        // Optionally create tweets from cross-platform messages
-        if (message.payload.content && this.shouldTweet(message)) {
-            await (this.client as any).tweet(message.payload.content);
-        }
-    }
-
-    private shouldTweet(message: CrossClientMessage): boolean {
-        // Implement logic to determine if a cross-platform message should be tweeted
-        return false;
-    }
-
-    private async handleAlert(message: CrossClientMessage): Promise<void> {
-        // Handle platform-wide alerts
-    }
-
-    private async handleNotification(message: CrossClientMessage): Promise<void> {
-        // Handle cross-platform notifications
-    }
-
-    private async handleCommand(message: CrossClientMessage): Promise<void> {
-        // Handle cross-platform commands
     }
 
     async start(): Promise<void> {
         try {
-            // Connect to RabbitMQ if configured
-            if (this.messageBroker) {
-                await this.messageBroker.connect();
+            await this.client.start();
+
+            // Subscribe to outbound messages from other processes
+            await this.redisClient.subscribe(REDIS_CHANNELS.SOCIAL_OUTBOUND, 
+                async (message: RedisMessage) => {
+                    if (message.source !== 'twitter') {
+                        await this.handleIncomingRedisMessage(message);
+                    }
+            });
+
+            // Set up event listeners for Twitter events
+            if (this.client instanceof EventEmitter) {
+                this.client.on('mention', (tweet: Tweet) => this.handleMention(tweet));
+                this.client.on('reply', (tweet: Tweet) => this.handleReply(tweet));
             }
 
-            await this.client.start();
             Logger.info('Twitter adapter started successfully');
         } catch (error) {
             Logger.error('Failed to start Twitter adapter:', error);
@@ -240,12 +204,13 @@ export class TwitterAdapter extends EventEmitter {
     }
 
     async stop(): Promise<void> {
-        if (this.messageBroker) {
-            await this.messageBroker.disconnect();
+        try {
+            await this.client.stop();
+            await this.redisClient.disconnect();
+            Logger.info('Twitter adapter stopped');
+        } catch (error) {
+            Logger.error('Error stopping Twitter adapter:', error);
+            throw error;
         }
-        await this.client.stop();
-        Logger.info('Twitter adapter stopped');
     }
-
- 
 }
