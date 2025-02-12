@@ -16,7 +16,6 @@ import { getAssociatedTokenAddress } from "@solana/spl-token";
 import { Connection, PublicKey } from "@solana/web3.js";
 import { v4 as uuidv4 } from "uuid";
 import type { ProcessedTokenData, TokenSecurityData } from "../types/token";
-import { SimulationSellingService } from "./simulationSellingService";
 import type { TokenProvider } from "./token";
 import { WalletProvider } from "./wallet";
 
@@ -52,7 +51,6 @@ interface TokenRecommendationSummary {
 export class TrustScoreManager {
     private tokenProvider: TokenProvider;
     private trustScoreDb: TrustScoreDatabase;
-    private simulationSellingService: SimulationSellingService;
     private connection: Connection;
     private baseMint: PublicKey;
     private DECAY_RATE = 0.95;
@@ -73,10 +71,6 @@ export class TrustScoreManager {
         );
         this.backend = runtime.getSetting("BACKEND_URL");
         this.backendToken = runtime.getSetting("BACKEND_TOKEN");
-        this.simulationSellingService = new SimulationSellingService(
-            runtime,
-            this.trustScoreDb
-        );
     }
 
     //getRecommenederBalance
@@ -467,10 +461,7 @@ export class TrustScoreManager {
             };
             this.trustScoreDb.addTransaction(transaction);
         }
-        this.simulationSellingService.processTokenPerformance(
-            tokenAddress,
-            recommenderId
-        );
+
         // api call to update trade performance
         this.createTradeInBe(tokenAddress, recommenderId, data);
         return creationData;

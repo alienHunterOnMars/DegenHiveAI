@@ -1108,24 +1108,24 @@ export class TokenProvider {
 
 const tokenAddress = PROVIDER_CONFIG.TOKEN_ADDRESSES.Example;
 
-const connection = new Connection(PROVIDER_CONFIG.DEFAULT_RPC);
-const tokenProvider: Provider = {
+const tokenProvider = {
     get: async (
-        runtime: any,
+        connection: Connection,
+        privateKey: string,
+        cacheManager: any,
         _message: Memory,
         _state?: State
     ): Promise<string> => {
         try {
-            const { publicKey } = await getWalletKey(runtime, false);
+            const { publicKey } = await getWalletKey(privateKey);
             if (!publicKey) throw new Error("No wallet public key found");
-
 
             const walletProvider = new WalletProvider(connection, publicKey);
 
             const provider = new TokenProvider(
                 tokenAddress,
                 walletProvider,
-                runtime.cacheManager
+                cacheManager
             );
 
             return provider.getFormattedTokenReport();

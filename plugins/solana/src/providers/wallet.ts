@@ -1,6 +1,5 @@
 import {
     type Memory,
-    type Provider,
     type State,
 } from "@hiveai/utils";
 import { Logger } from "@hiveai/utils";
@@ -67,7 +66,7 @@ export class WalletProvider {
     }
 
     private async fetchWithRetry(
-        runtime: any,
+        config: any,
         url: string,
         options: RequestInit = {}
     ): Promise<any> {
@@ -81,7 +80,7 @@ export class WalletProvider {
                         Accept: "application/json",
                         "x-chain": "solana",
                         "X-API-KEY":
-                            runtime.getSetting("BIRDEYE_API_KEY", "") || "",
+                            config.BIRDEYE_API_KEY || "",
                         ...options.headers,
                     },
                 });
@@ -113,7 +112,7 @@ export class WalletProvider {
         throw lastError;
     }
 
-    async fetchPortfolioValue(runtime: any): Promise<WalletPortfolio> {
+    async fetchPortfolioValue(config: any): Promise<WalletPortfolio> {
         try {
             const cacheKey = `portfolio-${this.walletPublicKey.toBase58()}`;
             const cachedValue = this.cache.get<WalletPortfolio>(cacheKey);
@@ -125,19 +124,19 @@ export class WalletProvider {
             Logger.log("Cache miss for fetchPortfolioValue");
 
             // Check if Birdeye API key is available
-            const birdeyeApiKey = runtime.getSetting("BIRDEYE_API_KEY");
+            const birdeyeApiKey = config.BIRDEYE_API_KEY;
 
             if (birdeyeApiKey) {
                 // Existing Birdeye API logic
                 const walletData = await this.fetchWithRetry(
-                    runtime,
+                    config,
                     `${PROVIDER_CONFIG.BIRDEYE_API}/v1/wallet/token_list?wallet=${this.walletPublicKey.toBase58()}`
                 );
 
                 if (walletData?.success && walletData?.data) {
                     const data = walletData.data;
                     const totalUsd = new BigNumber(data.totalUsd.toString());
-                    const prices = await this.fetchPrices(runtime);
+                    const prices = await this.fetchPrices(config);
                     const solPriceInUSD = new BigNumber(
                         prices.solana.usd.toString()
                     );
@@ -200,7 +199,7 @@ export class WalletProvider {
         }
     }
 
-    async fetchPortfolioValueCodex(runtime: any): Promise<WalletPortfolio> {
+    async fetchPortfolioValueCodex(config: any): Promise<WalletPortfolio> {
         try {
             const cacheKey = `portfolio-${this.walletPublicKey.toBase58()}`;
             const cachedValue = await this.cache.get<WalletPortfolio>(cacheKey);
@@ -235,7 +234,7 @@ export class WalletProvider {
                 headers: {
                     "Content-Type": "application/json",
                     Authorization:
-                        runtime.getSetting("CODEX_API_KEY", "") || "",
+                        config.CODEX_API_KEY || "",
                 },
                 body: JSON.stringify({
                     query,
@@ -251,7 +250,7 @@ export class WalletProvider {
             }
 
             // Fetch token prices
-            const prices = await this.fetchPrices(runtime);
+            const prices = await this.fetchPrices(config);
             const solPriceInUSD = new BigNumber(prices.solana.usd.toString());
 
             // Reformat items
@@ -297,7 +296,7 @@ export class WalletProvider {
         }
     }
 
-    async fetchPrices(runtime: any): Promise<Prices> {
+    async fetchPrices(config: any): Promise<Prices> {
         try {
             const cacheKey = "prices";
             const cachedValue = this.cache.get<Prices>(cacheKey);
@@ -318,7 +317,7 @@ export class WalletProvider {
 
             for (const token of tokens) {
                 const response = await this.fetchWithRetry(
-                    runtime,
+                    config,
                     `${PROVIDER_CONFIG.BIRDEYE_API}/defi/price?address=${token}`,
                     {
                         headers: {
@@ -352,11 +351,11 @@ export class WalletProvider {
     }
 
     formatPortfolio(
-        runtime: any,
+        config: any,
         portfolio: WalletPortfolio,
         prices: Prices
     ): string {
-        let output = `${runtime.character.description}\n`;
+        let output = `${config.character.description}\n`;
         output += `Wallet Address: ${this.walletPublicKey.toBase58()}\n\n`;
 
         const totalUsdFormatted = new BigNumber(portfolio.totalUsd).toFixed(2);
@@ -388,14 +387,14 @@ export class WalletProvider {
         return output;
     }
 
-    async getFormattedPortfolio(runtime: any): Promise<string> {
+    async getFormattedPortfolio(config: any): Promise<string> {
         try {
             const [portfolio, prices] = await Promise.all([
-                this.fetchPortfolioValue(runtime),
-                this.fetchPrices(runtime),
+                this.fetchPortfolioValue(config),
+                this.fetchPrices(config),
             ]);
 
-            return this.formatPortfolio(runtime, portfolio, prices);
+            return this.formatPortfolio(config, portfolio, prices);
         } catch (error) {
             Logger.error("Error generating portfolio report:", error);
             return "Unable to fetch wallet information. Please try again later.";
@@ -421,24 +420,24 @@ export class WalletProvider {
     }
 }
 
-const walletProvider: Provider = {
+const walletProvider = {
     get: async (
-        runtime: any,
+        privateKey: string,
+        config: any,
         _message: Memory,
         _state?: State
     ): Promise<string | null> => {
         try {
-            const { publicKey } = await getWalletKey(runtime, false);
+            const { publicKey } = await getWalletKey(privateKey);
 
             const connection = new Connection(
-                runtime.getSetting("SOLANA_RPC_URL") ||
-                    PROVIDER_CONFIG.DEFAULT_RPC
+                PROVIDER_CONFIG.DEFAULT_RPC
             );
 
             if (!publicKey) throw new Error("No wallet public key found");
             const provider = new WalletProvider(connection, publicKey);
 
-            return await provider.getFormattedPortfolio(runtime);
+            return await provider.getFormattedPortfolio(config);
         } catch (error) {
             Logger.error("Error in wallet provider:", error);
             return null;
