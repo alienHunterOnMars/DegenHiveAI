@@ -1,13 +1,9 @@
 export interface DiscordConfig {
     token: string;
-    guildId: string;
     announcementChannelId: string;
     alphaChannelId: string;
     memeChannelId: string;
-    messageBroker?: {
-        url: string;
-        exchange: string;
-    };
+    redis_url: string;
 }
 
 export interface DiscordMessage {

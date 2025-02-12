@@ -1,12 +1,9 @@
 import { Client, Events, GatewayIntentBits, Partials } from "discord.js";
 import { EventEmitter } from "events";
-import { Logger } from "@hiveai/utils";
-import { MessageHandler } from "./handlers/messageHandler";
+import { Logger, RedisClient, RedisMessage, REDIS_CHANNELS  } from "@hiveai/utils";
 import { AnnouncementHandler } from "./handlers/announcementHandler";
 import { CommunityHandler } from "./handlers/communityHandler";
 import { DiscordConfig } from "./types";
-import { MessageBroker, CrossClientMessage } from '@hiveai/messaging';
-import { DragonbeeInteractionManager } from './handlers/dragonbeeInteractionManager';
 
 interface ServerChannelInfo {
     id: string;
@@ -31,13 +28,13 @@ interface ServerInfo {
 }
 
 export class DiscordAdapter extends EventEmitter {
+
+    private config: DiscordConfig;
     private client: Client;
-    private messageHandler: MessageHandler;
+    private redisClient: RedisClient;
+
     private announcementHandler: AnnouncementHandler;
     private communityHandler: CommunityHandler;
-    private config: DiscordConfig;
-    private messageBroker?: MessageBroker;
-    private dragonbeeManager: DragonbeeInteractionManager;
 
     constructor(config: DiscordConfig) {
         super();
@@ -58,21 +55,13 @@ export class DiscordAdapter extends EventEmitter {
                 Partials.Reaction
             ]
         });
+        
+        // Initialize Redis client
+        this.redisClient = new RedisClient({ url: config.redis_url });
 
         // Initialize handlers
-        this.messageHandler = new MessageHandler(this.client);
         this.announcementHandler = new AnnouncementHandler(this.client, config);
-        this.communityHandler = new CommunityHandler(this.client);
-        this.dragonbeeManager = new DragonbeeInteractionManager(this.client);        
-
-        // Initialize RabbitMQ if config provided
-        if (config.messageBroker) {
-            this.messageBroker = new MessageBroker({
-                url: config.messageBroker.url,
-                exchange: config.messageBroker.exchange,
-                clientId: 'discord'
-            });
-        }
+        this.communityHandler = new CommunityHandler(this.client); 
     }
 
     private setupEventListeners(): void {
@@ -97,11 +86,10 @@ export class DiscordAdapter extends EventEmitter {
             try {
                 // Handle message based on context
                 if (message.channelId === this.config.announcementChannelId) {
-                    Logger.info("Processing announcement message");
-                    await this.announcementHandler.handleMessage(message);
+                    Logger.info("Announcement message - Nothing to do here");
                 } else {
                     Logger.info("Processing regular message");
-                    await this.messageHandler.handleMessage(message);
+                    await this.communityHandler.handleMessage(message, this.redisClient);
                 }
             } catch (error) {
                 Logger.error("Error handling Discord message:", error);
@@ -119,52 +107,7 @@ export class DiscordAdapter extends EventEmitter {
         Logger.info("Discord event listeners configured successfully");
     }
 
-    private setupMessageBroker(): void {
-        if (!this.messageBroker) return;
-        
-        // (this.messageBroker as unknown as EventEmitter).on('message', this.handleCrossClientMessage.bind(this));
-    }
-
-    private async handleCrossClientMessage(message: CrossClientMessage): Promise<void> {
-        if (!this.messageBroker) return;
-
-        try {
-            switch (message.type) {
-                case 'MESSAGE':
-                    await this.handleIncomingMessage(message);
-                    break;
-                case 'ALERT':
-                    await this.handleAlert(message);
-                    break;
-                case 'NOTIFICATION':
-                    await this.handleNotification(message);
-                    break;
-                case 'COMMAND':
-                    await this.handleCommand(message);
-                    break;
-            }
-        } catch (error) {
-            Logger.error('Error handling cross-client message:', error);
-        }
-    }
-
-    private async handleIncomingMessage(message: CrossClientMessage): Promise<void> {
-        // Implement cross-client message handling
-        // This could forward messages to appropriate Discord channels
-    }
-
-    private async handleAlert(message: CrossClientMessage): Promise<void> {
-        // Handle alerts, possibly sending them to a designated alerts channel
-    }
-
-    private async handleNotification(message: CrossClientMessage): Promise<void> {
-        // Handle notifications from other clients
-    }
-
-    private async handleCommand(message: CrossClientMessage): Promise<void> {
-        // Handle cross-client commands
-    }
-
+ 
     async start(): Promise<void> {
         try {
             if (this.client.isReady()) {
@@ -196,7 +139,7 @@ export class DiscordAdapter extends EventEmitter {
             });
 
             this.setupEventListeners();
-            this.setupMessageBroker();
+
             Logger.info("Discord adapter initialization complete");
 
         } catch (error) {
@@ -217,53 +160,13 @@ export class DiscordAdapter extends EventEmitter {
     }
 
     async stop(): Promise<void> {
-        // Disconnect RabbitMQ if connected
-        if (this.messageBroker) {
-            await this.messageBroker.disconnect();
-        }
-
         this.client.destroy();
+        await this.redisClient.disconnect();
         Logger.info("Discord adapter stopped");
     }
 
-    async handleAnnouncementResponse(
-        action: 'approve' | 'reject' | 'edit',
-        announcementId: string,
-        editedContent?: string
-    ): Promise<void> {
-        await this.announcementHandler.handleFounderResponse(
-            action,
-            announcementId,
-            editedContent
-        );
-    }
-
-    private async handleMessage(message: any): Promise<void> {
-        // Existing message handling logic...
-        
-        // Optionally broadcast certain messages to other clients
-        if (this.shouldBroadcastMessage(message)) {
-            await this.broadcastMessage(message.content);
-        }
-    }
-
-    private shouldBroadcastMessage(message: any): boolean {
-        // Implement logic to determine if a message should be broadcast
-        return false; // Default to false, implement your conditions
-    }
-
-    async broadcastMessage(content: string): Promise<void> {
-        if (!this.messageBroker) return;
-
-        await this.messageBroker.publish({
-            type: 'MESSAGE',
-            payload: {
-                content,
-                timestamp: Date.now()
-            }
-        });
-    }
-
+ 
+ 
     async getServers(): Promise<ServerInfo[]> {
         try {
             // Check if client is ready instead of just checking user

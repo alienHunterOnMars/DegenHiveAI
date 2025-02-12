@@ -105,9 +105,6 @@ importers:
       '@discordjs/voice':
         specifier: 0.16.1
         version: 0.16.1(@discordjs/opus@0.9.0(encoding@0.1.13))(bufferutil@4.0.9)(utf-8-validate@5.0.10)
-      '@hiveai/messaging':
-        specifier: workspace:*
-        version: link:../../messaging
       '@hiveai/utils':
         specifier: workspace:*
         version: link:../../utils
@@ -117,6 +114,9 @@ importers:
       events:
         specifier: ^3.3.0
         version: 3.3.0
+      uuid:
+        specifier: ^11.0.5
+        version: 11.0.5
       zod:
         specifier: 3.23.8
         version: 3.23.8
@@ -225,9 +225,6 @@ importers:
 
   adapters/reddit:
     dependencies:
-      '@hiveai/core':
-        specifier: workspace:*
-        version: link:../../core
       '@hiveai/messaging':
         specifier: workspace:*
         version: link:../../messaging
@@ -250,9 +247,6 @@ importers:
 
   adapters/telegram:
     dependencies:
-      '@hiveai/messaging':
-        specifier: workspace:*
-        version: link:../../messaging
       '@hiveai/utils':
         specifier: workspace:*
         version: link:../../utils

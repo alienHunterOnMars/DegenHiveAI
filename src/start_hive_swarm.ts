@@ -15,6 +15,7 @@
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import * as fs from 'node:fs';
+import { fork, type ChildProcess } from 'child_process';
 import * as dotenv from 'dotenv';
 import { Logger } from '@hiveai/utils';
 // import { KafkaEventBus } from './infrastructure/KafkaEventBus';
@@ -22,8 +23,6 @@ import { Logger } from '@hiveai/utils';
 // import { ServiceRegistry } from './infrastructure/ServiceRegistry';
 // import { AgentOrchestrator } from './services/agent-orchestrator/AgentOrchestrator';
 // import { MessageOrchestrator } from './services/message-orchestrator/MessageOrchestrator';
-import { DiscordAdapter } from "@hiveai/adapters-discord";
-import { TelegramAdapter } from '@hiveai/adapters-telegram';
 import { RedditAdapter } from '@hiveai/adapters-reddit';
 import { TwitterAdapter } from '@hiveai/adapters-twitter';
 import { FarcasterAdapter } from '@hiveai/adapters-farcaster';
@@ -58,61 +57,50 @@ export interface IPlugin {
     stop?(): Promise<void>;
 }
 
-/**
- * PluginManager is responsible for loading, initializing, and starting
- * plugins from module paths provided via an environment variable.
- *
- * For example, you can define:
- *   PLUGINS=@myorg/plugin-telegram,@myorg/plugin-discord
- *
- * Each plugin should export a default object that adheres to the IPlugin interface.
- */
-class PluginManager {
-    private plugins: IPlugin[] = [];
+class ProcessManager {
+    private processes: Map<string, ChildProcess> = new Map();
 
-    /**
-     * Loads plugin modules from a comma-separated list in process.env.PLUGINS.
-     */
-    async loadPlugins(): Promise<void> {
-        const pluginsList = process.env.PLUGINS ? process.env.PLUGINS.split(",") : [];
-        for (const pluginPath of pluginsList) {
-            try {
-                const module = await import(pluginPath.trim());
-                const plugin: IPlugin = module.default;
-                this.plugins.push(plugin);
-                Logger.info(`Plugin loaded: ${plugin.name}`);
-            } catch (error) {
-                Logger.error(`Failed to load plugin at ${pluginPath}:`, error);
-            }
+    async startProcess(name: string, scriptPath: string, env: any = {}): Promise<void> {
+        try {
+            const process = fork(scriptPath, [], {
+                env: env,
+                stdio: ['inherit', 'inherit', 'inherit', 'ipc']
+            });
+
+            process.on('message', (message) => {
+                Logger.info(`Message from ${name}:`, message);
+            });
+
+            process.on('error', (error) => {
+                Logger.error(`Process ${name} error:`, error);
+                this.restartProcess(name, scriptPath, env);
+            });
+
+            process.on('exit', (code) => {
+                if (code !== 0) {
+                    Logger.error(`Process ${name} exited with code ${code}`);
+                    this.restartProcess(name, scriptPath, env);
+                }
+            });
+
+            this.processes.set(name, process);
+            Logger.info(`Started process: ${name}`);
+        } catch (error) {
+            Logger.error(`Failed to start process ${name}:`, error);
+            throw error;
         }
     }
 
-    /**
-     * Runs the `init` method on every plugin, passing in a shared context.
-     */
-    async initializePlugins(context: any): Promise<void> {
-        for (const plugin of this.plugins) {
-            if (plugin.init) {
-                await plugin.init(context);
-                Logger.info(`Plugin initialized: ${plugin.name}`);
-            }
-        }
+    private async restartProcess(name: string, scriptPath: string, env: any): Promise<void> {
+        Logger.info(`Attempting to restart process: ${name}`);
+        await this.startProcess(name, scriptPath, env);
     }
 
-    /**
-     * Runs the `start` method on every plugin, passing in the same shared context.
-     */
-    async startPlugins(context: any): Promise<void> {
-        for (const plugin of this.plugins) {
-            if (plugin.start) {
-                await plugin.start(context);
-                Logger.info(`Plugin started: ${plugin.name}`);
-            }
+    async stopAll(): Promise<void> {
+        for (const [name, process] of this.processes) {
+            process.kill();
+            Logger.info(`Stopped process: ${name}`);
         }
-    }
-
-    getPlugins(): IPlugin[] {
-        return this.plugins;
     }
 }
 
@@ -121,78 +109,71 @@ class PluginManager {
 // ----------------------------------------------------------------------------
 
 class HiveSwarm {
+
     private config: any;
-    private adapters: Map<string, any>;
-    private plugins: Map<string, IPlugin>;
+    private processManager: ProcessManager;
+    private isShuttingDown: boolean = false;
+
+    // private plugins: Map<string, IPlugin>;
     // private eventBus: KafkaEventBus;
     // private redis: RedisClient;
     // private registry: ServiceRegistry;
     // private agentOrchestrator: AgentOrchestrator;
     // private messageOrchestrator: MessageOrchestrator;
-    private isShuttingDown: boolean = false;
 
+    
     constructor() {
-        // Load configuration
+        this.processManager = new ProcessManager();
         this.config = {};
         try {
             const configPath = process.env.CONFIG_PATH || './env.json';
-            if (!fs.existsSync(configPath)) {
-                Logger.warn(`Config file not found at ${configPath}, using defaults`);
-            }
-            const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-            this.config = config;
+            this.config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
         } catch (error) {
             Logger.error('Error loading config:', error);
+            return;
         }
 
         Logger.info('Config loaded:');
         Logger.info(this.config);
 
-        // Initialize infrastructure
-        this.adapters = new Map();
-        // this.eventBus = new KafkaEventBus(this.config.infrastructure.kafka);
-        // this.redis = new RedisClient(this.config.infrastructure.redis);
-        // this.registry = new ServiceRegistry(this.redis);
-
-        // Initialize orchestrators
-        // this.agentOrchestrator = new AgentOrchestrator(
-        //     this.eventBus,
-        //     this.registry,
-        //     this.redis,
-        //     this.config.sharding.shardId || 'shard-1'
-        // );
-
-        // this.messageOrchestrator = new MessageOrchestrator(
-        //     this.eventBus,
-        //     this.registry,
-        //     this.redis,
-        //     this.agentOrchestrator
-        // );
-
-        this.plugins = new Map();
+        // this.plugins = new Map();
     }
 
     async start() {
         try {
             Logger.info('Starting HiveAI Swarm...');
 
+            // Start Telegram process
+            await this.processManager.startProcess('telegram', './dist/processes/telegram.js', {
+                TELEGRAM_BOT_TOKEN: this.config.telegram?.token,
+                TELEGRAM_GROUP_CHAT_ID: this.config.telegram?.groupChatId,
+                TELEGRAM_FOUNDER_CHAT_ID: this.config.telegram?.founderChatId,
+                REDIS_URL: this.config.redis_url
+            });
+
+            // Start discord process
+            await this.processManager.startProcess('discord', './dist/processes/discord.js', {
+                DISCORD_TOKEN: this.config.discord?.token,
+                DISCORD_ANNOUNCEMENT_CHANNEL_ID: this.config.discord?.announcementChannelId,
+                DISCORD_ALPHA_CHANNEL_ID: this.config.discord?.alphaChannelId,
+                DISCORD_MEME_CHANNEL_ID: this.config.discord?.memeChannelId,
+                REDIS_URL: this.config.redis_url
+            });
+ 
+
+            // Start blockchain process
+            // await this.processManager.startProcess('blockchain', './dist/processes/blockchain.js', {
+            //     REDIS_URL: this.config.redis?.url,
+            //     RPC_ENDPOINTS: JSON.stringify(this.config.rpcEndpoints)
+            // });
+
+            this.setupShutdownHandlers();
+
             // Initialize plugins first
-            await this.initializePlugins();
-
-            // Connect infrastructure
-            await this.connectInfrastructure();
-
-            // Initialize and start adapters
-            await this.initializeAdapters();
+            // await this.initializePlugins();
 
             // Start plugins
-            await this.startPlugins();
-
-            // Setup health monitoring
-            this.setupHealthMonitoring();
-
-            // Handle shutdown
-            this.setupShutdownHandlers();
+            // await this.startPlugins();
 
             Logger.success('HiveAI Swarm started successfully!');
         } catch (error) {
@@ -201,207 +182,55 @@ class HiveSwarm {
         }
     }
 
-    private async initializePlugins(): Promise<void> {
-        try {
-            Logger.info('Initializing plugins...');
+    // private async initializePlugins(): Promise<void> {
+    //     try {
+    //         Logger.info('Initializing plugins...');
 
-            // Initialize core plugins
-            const corePlugins = [
-                // { name: 'solana', plugin: solanaPlugin },
-                // { name: 'sui', plugin: suiPlugin },
-                // { name: 'hyperliquid', plugin: hyperliquidPlugin },
-                { name: 'trustdb', plugin: trustDBPlugin }
-            ];
+    //         // Initialize core plugins
+    //         const corePlugins = [
+    //             // { name: 'solana', plugin: solanaPlugin },
+    //             // { name: 'sui', plugin: suiPlugin },
+    //             // { name: 'hyperliquid', plugin: hyperliquidPlugin },
+    //             { name: 'trustdb', plugin: trustDBPlugin }
+    //         ];
 
-            for (const { name, plugin } of corePlugins) {
-                if (this.config.plugins.enabled.includes(name)) {
-                    try {
-                        const pluginConfig = this.config.plugins.config[name] || {};
-                        await plugin.init?.(pluginConfig);
-                        this.plugins.set(name, plugin);
-                        Logger.info(`Plugin initialized: ${name}`);
-                    } catch (error) {
-                        Logger.error(`Failed to initialize plugin ${name}:`, error);
-                    }
-                }
-            }
-        } catch (error) {
-            Logger.error('Failed to initialize plugins:', error);
-            throw error;
-        }
-    }
+    //         // for (const { name, plugin } of corePlugins) {
+    //         //     if (this.config.plugins.enabled.includes(name)) {
+    //         //         try {
+    //         //             const pluginConfig = this.config.plugins.config[name] || {};
+    //         //             await plugin.init?.(pluginConfig);
+    //         //             this.plugins.set(name, plugin);
+    //         //             Logger.info(`Plugin initialized: ${name}`);
+    //         //         } catch (error) {
+    //         //             Logger.error(`Failed to initialize plugin ${name}:`, error);
+    //         //         }
+    //         //     }
+    //         // }
+    //     } catch (error) {
+    //         Logger.error('Failed to initialize plugins:', error);
+    //         throw error;
+    //     }
+    // }
 
-    private async startPlugins(): Promise<void> {
-        try {
-            Logger.info('Starting plugins...');
+    // private async startPlugins(): Promise<void> {
+    //     try {
+    //         Logger.info('Starting plugins...');
 
-            for (const [name, plugin] of this.plugins.entries()) {
-                try {
-                    await plugin.start?.();
-                    Logger.info(`Plugin started: ${name}`);
-                } catch (error) {
-                    Logger.error(`Failed to start plugin ${name}:`, error);
-                }
-            }
+    //         for (const [name, plugin] of this.plugins.entries()) {
+    //             try {
+    //                 await plugin.start?.();
+    //                 Logger.info(`Plugin started: ${name}`);
+    //             } catch (error) {
+    //                 Logger.error(`Failed to start plugin ${name}:`, error);
+    //             }
+    //         }
 
-        } catch (error) {
-            Logger.error('Failed to start plugins:', error);
-            throw error;
-        }
-    }
-
-    private async connectInfrastructure(): Promise<void> {
-        try {
-            // await this.eventBus.connect();
-            // await this.registry.connect();
-        } catch (error) {
-            Logger.error('Failed to connect infrastructure:', error);
-            throw error;
-        }
-    }
-
-    private async initializeAdapters(): Promise<void> {
-        try {
-
-            const envData = fs.readFileSync('./env.json', 'utf8');
-            const envConfig = JSON.parse(envData);
-            Logger.info('Successfully loaded env.json configuration');
-
-
-            // // Initialize Discord adapter
-            // if (envConfig.discord) {
-            //     const discordAdapter = new DiscordAdapter({
-            //         ...envConfig.discord,
-            //         messageBroker: {
-            //             url: this.config.infrastructure.kafka.brokers.join(','),
-            //             exchange: 'social.messages'
-            //         }
-            //     });
-            //     this.adapters.set('discord', discordAdapter);
-            // }
-
-            // // Initialize Telegram adapter
-            // if (this.config.telegram) {
-            //     const telegramAdapter = new TelegramAdapter({
-            //         ...envConfig.telegram,
-            //         messageBroker: {
-            //             url: this.config.infrastructure.kafka.brokers.join(','),
-            //             exchange: 'social.messages'
-            //         }
-            //     });
-            //     this.adapters.set('telegram', telegramAdapter);
-            // }
-
-            // // Initialize Reddit adapter
-            // if (envConfig.reddit) {
-            //     const redditAdapter = new RedditAdapter({
-            //         ...envConfig.reddit,
-            //         messageBroker: {
-            //             url: this.config.infrastructure.kafka.brokers.join(','),
-            //             exchange: 'social.messages'
-            //         }
-            //     });
-            //     this.adapters.set('reddit', redditAdapter);
-            // }
-
-            // // Initialize Farcaster adapter
-            // if (envConfig.farcaster) {
-            //     const farcasterAdapter = new FarcasterAdapter({
-            //         ...envConfig.farcaster,
-            //         messageBroker: {
-            //             url: this.config.infrastructure.kafka.brokers.join(','),
-            //             exchange: 'social.messages'
-            //         }
-            //     });
-            //     this.adapters.set('farcaster', farcasterAdapter);
-            // }
-
-            // // Initialize Email adapter
-            // if (envConfig.email) {
-            //     const emailAdapter = new EmailAdapter({
-            //         ...envConfig.email,
-            //         messageBroker: {
-            //             url: this.config.infrastructure.kafka.brokers.join(','),
-            //             exchange: 'social.messages'
-            //         }
-            //     });
-            //     this.adapters.set('email', emailAdapter);
-            // }
-
-            // // Initialize Twitter adapter
-            // if (envConfig.twitter) {
-            //     const twitterAdapter = new TwitterAdapter({
-            //         ...envConfig.twitter,
-            //         messageBroker: {
-            //             url: this.config.infrastructure.kafka.brokers.join(','),
-            //             exchange: 'social.messages'
-            //         }
-            //     });
-            //     this.adapters.set('twitter', twitterAdapter);
-            // }
-
-            await Promise.all([...this.adapters.values()].map(adapter => adapter.start()));
-        } catch (error) {
-            Logger.error('Failed to initialize adapters:', error);
-            throw error;
-        }
-    }
-
-    private async startOrchestrators(): Promise<void> {
-        try {
-            // await this.agentOrchestrator.start();
-            // await this.messageOrchestrator.start();
-        } catch (error) {
-            Logger.error('Failed to start orchestrators:', error);
-            throw error;
-        }
-    }
-
-    private setupHealthMonitoring(): void {
-        setInterval(async () => {
-            try {
-                const health = await this.checkHealth();
-                if (!health.healthy) {
-                    Logger.error('Health check failed:', health.issues);
-                }
-            } catch (error) {
-                Logger.error('Health check error:', error);
-            }
-        }, 30000); // Every 30 seconds
-    }
-
-    private async checkHealth(): Promise<{ healthy: boolean; issues: string[] }> {
-        const issues: string[] = [];
-
-        // Check event bus
-        // if (!await this.eventBus.healthCheck()) {
-        //     issues.push('EventBus unhealthy');
-        // }
-
-        // Check Redis
-        // if (!await this.redis.healthCheck()) {
-        //     issues.push('Redis unhealthy');
-        // }
-
-        // Check adapters
-        // for (const [name, adapter] of this.adapters.entries()) {
-        //     if (!await adapter.healthCheck()) {
-        //         issues.push(`${name} adapter unhealthy`);
-        //     }
-        // }
-
-        // Check plugins
-        for (const [name, plugin] of this.plugins.entries()) {
-            if (plugin.healthCheck && !(await plugin.healthCheck())) {
-                issues.push(`Plugin ${name} unhealthy`);
-            }
-        }
-
-        return {
-            healthy: issues.length === 0,
-            issues
-        };
-    }
+    //     } catch (error) {
+    //         Logger.error('Failed to start plugins:', error);
+    //         throw error;
+    //     }
+    // }
+  
 
     private setupShutdownHandlers(): void {
         const shutdown = async (code: number = 0) => {
@@ -409,78 +238,32 @@ class HiveSwarm {
             this.isShuttingDown = true;
 
             Logger.info('Shutting down HiveAI Swarm...');
+            await this.processManager.stopAll();
+            Logger.success('HiveAI Swarm shutdown complete');
+            process.exit(code);
+        };
             
-            try {
-                // Stop all adapters
-                await Promise.all([...this.adapters.values()].map(adapter => adapter.stop()));
-                
-                // Stop orchestrators
-                // await this.messageOrchestrator.stop();
-                // await this.agentOrchestrator.stop();
-
-                // Disconnect infrastructure
-                // await this.eventBus.disconnect();
-                // await this.redis.disconnect();
-                // await this.registry.disconnect();
-                
-                Logger.success('HiveAI Swarm shutdown complete');
-            } catch (error) {
-                Logger.error('Error during shutdown:', error);
-            } finally {
+            process.on('SIGTERM', () => shutdown());
+            process.on('SIGINT', () => shutdown());
+            process.on('uncaughtException', (error) => {
+                Logger.error('Uncaught exception:', error);
+                shutdown(1);
+            });
+    }
+    
+  
+    private async shutdown(code: number = 0): Promise<void> {
+            if (this.isShuttingDown) {
                 process.exit(code);
             }
-        };
-
-        // Handle graceful shutdown
-        process.on('SIGTERM', () => shutdown());
-        process.on('SIGINT', () => shutdown());
-        process.on('uncaughtException', (error) => {
-            Logger.error('Uncaught exception:', error);
-            shutdown(1);
-        });
-    }
-
-    private async shutdown(code: number = 0): Promise<never> {
-        if (this.isShuttingDown) {
+            
+            this.isShuttingDown = true;
+            await this.processManager.stopAll();
             process.exit(code);
-        }
-        
-        this.isShuttingDown = true;
-        
-        try {
-            Logger.info('Initiating shutdown sequence...');
-            
-            // Stop accepting new requests
-            // await this.messageOrchestrator.stop();
-            
-            // Wait for pending operations to complete (with timeout)
-            await Promise.race([
-                this.waitForPendingOperations(),
-                new Promise(resolve => setTimeout(resolve, 10000)) // 10s timeout
-            ]);
-            
-            // Force shutdown
-            await this.forceShutdown();
-            
-        } catch (error) {
-            Logger.error('Error during shutdown:', error);
-        } finally {
-            process.exit(code);
-        }
     }
 
-    private async waitForPendingOperations(): Promise<void> {
-        // Wait for pending trades to complete
-        // Wait for active agent operations
-        // etc.
-    }
-
-    private async forceShutdown(): Promise<void> {
-        await Promise.allSettled([
-            ...Array.from(this.adapters.values()).map(adapter => adapter.stop()),
-            ...Array.from(this.plugins.values()).map(plugin => plugin.stop?.())
-        ]);
-    }
+ 
+ 
 }
 
 // Create and start the swarm

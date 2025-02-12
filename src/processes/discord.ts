@@ -1,17 +1,19 @@
 // processes/telegram.ts
-import { TelegramAdapter } from '@hiveai/adapters-telegram';
+import { DiscordAdapter } from '@hiveai/adapters-discord';
 import { Logger } from '@hiveai/utils';
 
-export async function startTelegram() {
+export async function startDiscord() {
     try {
         const config = {
-            token: process.env.TELEGRAM_BOT_TOKEN!,
-            groupChatId: process.env.TELEGRAM_GROUP_CHAT_ID!,
-            founderChatId: process.env.TELEGRAM_FOUNDER_CHAT_ID!,
+            token: process.env.DISCORD_TOKEN!,
+            guildId: process.env.DISCORD_GUILD_ID!,
+            announcementChannelId: process.env.DISCORD_ANNOUNCEMENT_CHANNEL_ID!,
+            alphaChannelId: process.env.DISCORD_ALPHA_CHANNEL_ID!,
+            memeChannelId: process.env.DISCORD_MEME_CHANNEL_ID!,
             redis_url: process.env.REDIS_URL!
         };
 
-        const adapter = new TelegramAdapter(config);
+        const adapter = new DiscordAdapter(config);
 
         // Handle graceful shutdown
         process.on('SIGTERM', async () => {
@@ -33,7 +35,7 @@ export async function startTelegram() {
 }
  
 
-startTelegram().catch(error => {
+startDiscord().catch(error => {
     Logger.error('Unhandled error in Telegram process:', error);
     process.exit(1);
 });

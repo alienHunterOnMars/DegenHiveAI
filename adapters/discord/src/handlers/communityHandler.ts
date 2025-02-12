@@ -1,7 +1,8 @@
 import { Client, Message, MessageReaction, User, TextChannel, EmbedBuilder } from "discord.js";
-import { Logger } from "@hiveai/utils";
+import { Logger, REDIS_CHANNELS, RedisClient } from "@hiveai/utils";
 import { EngagementMetrics, CommunityStats } from "../types";
-// import { OpenAIService } from "@hiveai/services";
+import { v4 as uuid } from 'uuid';
+
 
 interface EngagementConfig {
     minTimeBetweenMessages: number;  // Minimum time between bot messages (ms)
@@ -35,7 +36,7 @@ export class CommunityHandler {
         this.setupDailyReset();
     }
 
-    async handleMessage(message: Message): Promise<void> {
+    async handleMessage(message: Message, redisClient: RedisClient): Promise<void> {
         try {
             // Update engagement metrics
             await this.updateEngagementMetrics(message);
@@ -50,6 +51,9 @@ export class CommunityHandler {
 
             // Periodically check for opportunities to revive dead discussions
             await this.checkForRevivalOpportunities(message.channelId);
+
+            // Publish the message to the Redis channel
+            await this.publishMessage(message, redisClient);
 
         } catch (error) {
             Logger.error("Error handling community message:", error);
@@ -272,5 +276,18 @@ export class CommunityHandler {
     private async getRecentMessages(channel: TextChannel): Promise<any[]> {
         // Get recent messages from the channel
         return [];
+    }
+
+
+    private async publishMessage(message: Message, redisClient: RedisClient): Promise<void> {
+        await redisClient.publish(REDIS_CHANNELS.SOCIAL_INBOUND, {
+            id: uuid(),
+            timestamp: Date.now(),
+            type: 'SOCIAL',
+            source: 'discord',
+            payload: {
+                message: message.content
+            }
+        });
     }
 } 

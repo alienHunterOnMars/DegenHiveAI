@@ -14,18 +14,13 @@ import { TradeManager } from "./tradeManager";
 import { RLManager } from "./rlManager";
 import { MemoryManager } from "./memoryManager";
 import { v4 as uuid } from 'uuid';
-
-export interface TelegramConfig extends TelegramClientOptions {
-    redis: {
-        url: string;
-    };
-}
+ 
 
 export class TelegramAdapter extends EventEmitter {
     private client: TelegramClient;
-    private readonly config: TelegramConfig;
+    private readonly config: TelegramClientOptions;
 
-    constructor(config: TelegramConfig) {
+    constructor(config: TelegramClientOptions) {
         super();
 
         this.config = config;
