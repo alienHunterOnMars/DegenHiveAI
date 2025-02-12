@@ -145,6 +145,9 @@ importers:
       '@hiveai/utils':
         specifier: workspace:*
         version: link:../../utils
+      '@types/uuid':
+        specifier: ^10.0.0
+        version: 10.0.0
       events:
         specifier: ^3.3.0
         version: 3.3.0
@@ -157,6 +160,9 @@ importers:
       nodemailer:
         specifier: ^6.9.0
         version: 6.10.0
+      uuid:
+        specifier: ^11.0.5
+        version: 11.0.5
     devDependencies:
       '@types/events':
         specifier: ^3.0.3
@@ -225,9 +231,6 @@ importers:
 
   adapters/reddit:
     dependencies:
-      '@hiveai/messaging':
-        specifier: workspace:*
-        version: link:../../messaging
       '@hiveai/utils':
         specifier: workspace:*
         version: link:../../utils
