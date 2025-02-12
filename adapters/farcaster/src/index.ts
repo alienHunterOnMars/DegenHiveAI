@@ -4,8 +4,10 @@ import { FarcasterInteractionManager } from "./interactions";
 import { Configuration, NeynarAPIClient } from "@neynar/nodejs-sdk";
 import { validateFarcasterConfig, type FarcasterAdapterConfig } from "./environment";
 import { EventEmitter } from 'events';
-import { Logger } from '@hiveai/utils';
-import { MessageBroker, CrossClientMessage } from '@hiveai/messaging';
+import { Logger, RedisClient, RedisMessage, REDIS_CHANNELS } from '@hiveai/utils';
+import { v4 as uuid } from 'uuid';
+import type { Cast } from './types';
+import { setInterval } from 'timers';
 
 /**
  * A manager that orchestrates all Farcaster operations:
@@ -101,15 +103,12 @@ export interface FarcasterConfig {
     username: string;
     signerUuid: string;
     hubUrl: string;
-    messageBroker?: {
-        url: string;
-        exchange: string;
-    };
+    redis_url: string;
 }
 
 export class FarcasterAdapter extends EventEmitter {
     private client: FarcasterClient;
-    private messageBroker?: MessageBroker;
+    private redisClient: RedisClient;
     private readonly config: FarcasterConfig;
 
     constructor(config: FarcasterConfig) {
@@ -128,77 +127,107 @@ export class FarcasterAdapter extends EventEmitter {
             farcasterConfig: {} as any
         });
 
-        // Initialize RabbitMQ if config provided
-        if (config.messageBroker) {
-            this.messageBroker = new MessageBroker({
-                url: config.messageBroker.url,
-                exchange: config.messageBroker.exchange,
-                clientId: 'farcaster'
+        // Setup Redis client
+        this.redisClient = new RedisClient({ url: config.redis_url });
+    }
+
+    private async handleCast(cast: Cast): Promise<void> {
+        try {
+            await this.redisClient.publish(REDIS_CHANNELS.SOCIAL_INBOUND, {
+                id: uuid(),
+                timestamp: Date.now(),
+                type: 'SOCIAL',
+                source: 'farcaster',
+                payload: {
+                    castId: cast.hash,
+                    text: cast.text,
+                    authorFid: cast.authorFid,
+                    authorUsername: cast.profile.username,
+                    authorName: cast.profile.name,
+                    inReplyTo: cast.inReplyTo,
+                    type: cast.inReplyTo ? 'reply' : 'cast'
+                }
             });
-            this.setupMessageBroker();
+            Logger.info('Published cast to Redis:', cast.hash);
+        } catch (error) {
+            Logger.error('Error publishing cast to Redis:', error);
         }
     }
 
-    private setupMessageBroker(): void {
-        if (!this.messageBroker) return;
-        this.messageBroker.on('message', this.handleCrossClientMessage.bind(this));
-    }
-
-    private async handleCrossClientMessage(message: CrossClientMessage): Promise<void> {
-        if (!this.messageBroker) return;
-
+    private async handleIncomingRedisMessage(message: RedisMessage): Promise<void> {
         try {
-            switch (message.type) {
-                case 'MESSAGE':
-                    await this.handleIncomingMessage(message);
+            Logger.info("Farcaster Adapter :: handleIncomingRedisMessage", message);
+
+            if (message.type !== 'SOCIAL' || !message.payload) {
+                return;
+            }
+
+            switch (message.payload.type) {
+                case 'cast':
+                    await this.client.cast(message.payload.text);
                     break;
-                case 'ALERT':
-                    await this.handleAlert(message);
+                case 'reply':
+                    if (message.payload.inReplyTo) {
+                        await this.client.publishCast(
+                            message.payload.text,
+                            {
+                                hash: message.payload.inReplyTo.hash,
+                                fid: message.payload.inReplyTo.fid
+                            }
+                        );
+                    }
                     break;
-                case 'NOTIFICATION':
-                    await this.handleNotification(message);
-                    break;
-                case 'COMMAND':
-                    await this.handleCommand(message);
-                    break;
+                default:
+                    Logger.warn('Unknown message type:', message.payload.type);
             }
         } catch (error) {
-            Logger.error('Error handling cross-client message:', error);
+            Logger.error('Error handling Redis message:', error);
         }
-    }
-
-    private async handleIncomingMessage(message: CrossClientMessage): Promise<void> {
-        // Handle cross-platform messages, maybe create casts
-        if (message.payload.content && this.shouldCast(message)) {
-            await this.client.cast(message.payload.content);
-        }
-    }
-
-    private shouldCast(message: CrossClientMessage): boolean {
-        // Implement logic to determine if a cross-platform message should be cast
-        return false;
-    }
-
-    private async handleAlert(message: CrossClientMessage): Promise<void> {
-        // Handle platform-wide alerts
-    }
-
-    private async handleNotification(message: CrossClientMessage): Promise<void> {
-        // Handle cross-platform notifications
-    }
-
-    private async handleCommand(message: CrossClientMessage): Promise<void> {
-        // Handle cross-platform commands
     }
 
     async start(): Promise<void> {
         try {
-            // Connect to RabbitMQ if configured
-            if (this.messageBroker) {
-                await this.messageBroker.connect();
-            }
+            // Subscribe to Redis messages
+            await this.redisClient.subscribe(REDIS_CHANNELS.SOCIAL_OUTBOUND, 
+                async (message: RedisMessage) => {
+                    if (message.source !== 'farcaster') {
+                        await this.handleIncomingRedisMessage(message);
+                    }
+            });
 
+            // Start monitoring mentions and timeline
             await this.client.connect();
+            
+            // Set up polling for new mentions and casts
+            setInterval(async () => {
+                try {
+                    const agentFid = Number(this.config.username);
+                    
+                    // Check mentions
+                    const mentions = await this.client.getMentions({
+                        fid: agentFid,
+                        pageSize: 10
+                    });
+                    
+                    for (const mention of mentions) {
+                        await this.handleCast(mention);
+                    }
+
+                    // Check timeline
+                    const { timeline } = await this.client.getTimeline({
+                        fid: agentFid,
+                        pageSize: 10
+                    });
+
+                    for (const cast of timeline) {
+                        await this.handleCast(cast);
+                    }
+
+                } catch (error) {
+                    Logger.error('Error polling Farcaster:', error);
+                }
+            }, 60000); // Poll every minute
+
             Logger.info('Farcaster adapter started successfully');
         } catch (error) {
             Logger.error('Failed to start Farcaster adapter:', error);
@@ -207,11 +236,8 @@ export class FarcasterAdapter extends EventEmitter {
     }
 
     async stop(): Promise<void> {
-        if (this.messageBroker) {
-            await this.messageBroker.disconnect();
-        }
+        await this.redisClient.disconnect();
         await this.client.disconnect();
         Logger.info('Farcaster adapter stopped');
     }
- 
 }

@@ -139,9 +139,6 @@ importers:
 
   adapters/email:
     dependencies:
-      '@hiveai/messaging':
-        specifier: workspace:*
-        version: link:../../messaging
       '@hiveai/utils':
         specifier: workspace:*
         version: link:../../utils
@@ -200,9 +197,15 @@ importers:
       '@neynar/nodejs-sdk':
         specifier: ^2.0.3
         version: 2.10.0(bufferutil@4.0.9)(encoding@0.1.13)(typescript@5.7.3)(utf-8-validate@5.0.10)(zod@3.23.8)
+      '@types/uuid':
+        specifier: ^10.0.0
+        version: 10.0.0
       js-sha1:
         specifier: ^0.7.0
         version: 0.7.0
+      uuid:
+        specifier: ^11.0.5
+        version: 11.0.5
       viem:
         specifier: ^2.22.22
         version: 2.22.22(bufferutil@4.0.9)(typescript@5.7.3)(utf-8-validate@5.0.10)(zod@3.23.8)
