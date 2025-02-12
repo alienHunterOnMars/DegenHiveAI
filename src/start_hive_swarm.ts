@@ -135,7 +135,7 @@ class HiveSwarm {
         // Load configuration
         this.config = {};
         try {
-            const configPath = process.env.CONFIG_PATH || './config.json';
+            const configPath = process.env.CONFIG_PATH || './env.json';
             if (!fs.existsSync(configPath)) {
                 Logger.warn(`Config file not found at ${configPath}, using defaults`);
             }
@@ -144,6 +144,9 @@ class HiveSwarm {
         } catch (error) {
             Logger.error('Error loading config:', error);
         }
+
+        Logger.info('Config loaded:');
+        Logger.info(this.config);
 
         // Initialize infrastructure
         this.adapters = new Map();
@@ -222,22 +225,6 @@ class HiveSwarm {
                     }
                 }
             }
-
-            // Initialize any additional plugins from env config
-            const additionalPlugins = this.config.plugins.enabled
-                .filter((name: string) => !corePlugins.find((p: any) => p.name === name));
-
-            for (const pluginName of additionalPlugins) {
-                try {
-                    const plugin = await import(pluginName);
-                    await plugin.init?.(this.config.plugins.config[pluginName]);
-                    this.plugins.set(pluginName, plugin);
-                    Logger.info(`Additional plugin initialized: ${pluginName}`);
-                } catch (error) {
-                    Logger.error(`Failed to initialize plugin ${pluginName}:`, error);
-                }
-            }
-
         } catch (error) {
             Logger.error('Failed to initialize plugins:', error);
             throw error;

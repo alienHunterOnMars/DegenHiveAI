@@ -3,7 +3,7 @@ import {
     Service,
     ServiceType,
 } from "@hiveai/utils";
-import { getFullnodeUrl, SuiClient } from "@mysten/sui/client";
+import { SuiClient } from "@mysten/sui/client";
 import { parseAccount, SuiNetwork } from "../utils";
 import { AggregatorClient, Env } from "@cetusprotocol/aggregator-sdk";
 import BN from "bn.js";
@@ -28,14 +28,12 @@ export class SuiService extends Service {
     private network!: SuiNetwork;
     private wallet!: Signer;
 
-    async initialize(runtime: any): Promise<void> {
+    async initialize(config: any): Promise<void> {
         this.suiClient = new SuiClient({
-            url: getFullnodeUrl(
-                runtime.getSetting("SUI_NETWORK") as SuiNetwork
-            ),
+            url: config.url,
         });
-        this.network = runtime.getSetting("SUI_NETWORK") as SuiNetwork;
-        this.wallet = parseAccount(runtime);
+        this.network = config.network as SuiNetwork;
+
         return Promise.resolve();
     }
 
@@ -44,8 +42,9 @@ export class SuiService extends Service {
         return meta;
     }
 
-    getAddress() {
-        return this.wallet.toSuiAddress();
+    getAddress( privateKey: string ) {
+        let wallet = parseAccount(privateKey);
+        return wallet.toSuiAddress();
     }
 
     getAmount(amount: string | number, meta: TokenMetadata) {
@@ -68,7 +67,36 @@ export class SuiService extends Service {
         }
     }
 
+    async transferToken(
+        privateKey: string,
+        recipient: string,
+        amount: number | string,
+        token: string
+    ): Promise<any> {
+        let wallet = parseAccount(privateKey);
+
+        const tx = new Transaction();
+        tx.setSender(wallet.toSuiAddress());
+        // tx.transferObjects([coin], recipient);
+
+        const result = await this.suiClient.signAndExecuteTransaction(
+            { transaction: tx, signer: wallet }
+        );
+        await this.suiClient.waitForTransaction({
+            digest: result.digest,
+        });
+
+        return {
+            success: true,
+            tx: result.digest,
+            message: "Swap successful",
+        };
+
+    }
+
+
     async swapToken(
+        privateKey: string,
         fromToken: string,
         amount: number | string,
         out_min_amount: number,
@@ -81,9 +109,11 @@ export class SuiService extends Service {
             throw new Error('Token metadata not found');
         }
 
+        let wallet = parseAccount(privateKey);
+
         const client = new AggregatorClient(
             aggregatorURL,
-            this.wallet.toSuiAddress(),
+            wallet.toSuiAddress(),
             this.suiClient,
             Env.Mainnet
         );
@@ -146,7 +176,7 @@ export class SuiService extends Service {
             coin = routerTx.splitCoins(routerTx.gas, [amount]);
         } else {
             const allCoins = await this.suiClient.getCoins({
-                owner: this.wallet.toSuiAddress(),
+                owner: wallet.toSuiAddress(),
                 coinType: fromMeta.tokenAddress,
                 limit: 30,
             });
@@ -193,11 +223,11 @@ export class SuiService extends Service {
         //     ],
         //     typeArguments: [otherType],
         // });
-        routerTx.transferObjects([targetCoin], this.wallet.toSuiAddress());
-        routerTx.setSender(this.wallet.toSuiAddress());
+        routerTx.transferObjects([targetCoin], wallet.toSuiAddress());
+        routerTx.setSender(wallet.toSuiAddress());
         const result = await client.signAndExecuteTransaction(
             routerTx,
-            this.wallet
+            wallet
         );
 
         await this.suiClient.waitForTransaction({

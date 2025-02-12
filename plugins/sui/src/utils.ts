@@ -3,15 +3,16 @@ import { Ed25519Keypair } from "@mysten/sui/keypairs/ed25519";
 import { Secp256k1Keypair } from "@mysten/sui/keypairs/secp256k1";
 import { Secp256r1Keypair } from "@mysten/sui/keypairs/secp256r1";
 
-const parseAccount = (runtime: any): Signer => {
-    const privateKey = runtime.getSetting("SUI_PRIVATE_KEY");
+const parseAccount = (privateKey: string): Signer => {
     if (!privateKey) {
-        throw new Error("SUI_PRIVATE_KEY is not set");
+        throw new Error("privateKey is not set");
     }
-    if (privateKey.startsWith("suiprivkey")) {
-        return loadFromSecretKey(privateKey);
+    if ( !privateKey.startsWith("suiprivkey") ) {
+        throw new Error("privateKey is not a valid SUI private key");
     }
-    return loadFromMnemonics(privateKey);
+
+    return loadFromSecretKey(privateKey);
+
 };
 
 const loadFromSecretKey = (privateKey: string) => {
