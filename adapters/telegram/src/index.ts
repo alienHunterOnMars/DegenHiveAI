@@ -8,7 +8,6 @@
  */
 import { EventEmitter } from 'events';
 import { Logger, RedisClient, RedisMessage, REDIS_CHANNELS } from '@hiveai/utils';
-import { MessageBroker, CrossClientMessage } from '@hiveai/messaging';
 import { TelegramClient, TelegramClientOptions } from './telegramClient';
 import { UserManager } from "./userManager";
 import { TradeManager } from "./tradeManager";

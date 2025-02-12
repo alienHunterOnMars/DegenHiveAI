@@ -1,6 +1,5 @@
 import amqp, { Channel, Connection } from 'amqplib';
 import { EventEmitter } from 'events';
-import { Logger } from '@hiveai/utils';
 
 export interface MessageBrokerConfig {
     url: string;
@@ -45,14 +44,12 @@ export class MessageBroker extends EventEmitter {
                             this.emit('message', message);
                         }
                     } catch (error) {
-                        Logger.error('Error processing message:', error);
+                        console.log('Error processing message:');
                     }
                 }
             }, { noAck: true });
 
-            Logger.info(`MessageBroker connected for ${this.config.clientId}`);
         } catch (error) {
-            Logger.error('Failed to connect to MessageBroker:', error);
             throw error;
         }
     }
@@ -61,9 +58,7 @@ export class MessageBroker extends EventEmitter {
         try {
             await this.channel?.close();
             await this.connection?.close();
-            Logger.info(`MessageBroker disconnected for ${this.config.clientId}`);
         } catch (error) {
-            Logger.error('Error disconnecting from MessageBroker:', error);
             throw error;
         }
     }
@@ -85,7 +80,6 @@ export class MessageBroker extends EventEmitter {
                 Buffer.from(JSON.stringify(fullMessage))
             );
         } catch (error) {
-            Logger.error('Error publishing message:', error);
             throw error;
         }
     }

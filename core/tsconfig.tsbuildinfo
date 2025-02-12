@@ -1,1 +1,0 @@
-{"root":["./src/context.ts","./src/embedding.ts","./src/generation.ts","./src/index.ts","./src/localembeddingmanager.ts","./src/models.ts","./src/parsing.ts","./src/settings.ts","./src/types.ts","./src/uuid.ts","./src/types/index.d.ts"],"errors":true,"version":"5.7.3"}

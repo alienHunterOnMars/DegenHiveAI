@@ -22,7 +22,6 @@
 		"test:coverage": "vitest run --coverage"
     },
     "dependencies": {
-        "@hiveai/core": "workspace:*",
         "@hiveai/messaging": "workspace:*",
         "@hiveai/utils": "workspace:*",
         "snoowrap": "^1.23.0"

@@ -24,7 +24,6 @@
         "test:coverage": "vitest run --coverage"
     },
     "dependencies": {
-        "@hiveai/messaging": "workspace:*",
         "@hiveai/utils": "workspace:*",
         "events": "^3.3.0",
         "ioredis": "^5.5.0",

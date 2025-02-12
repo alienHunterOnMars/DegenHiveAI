@@ -2,7 +2,7 @@
 import { TelegramAdapter } from '@hiveai/adapters-telegram';
 import { Logger } from '@hiveai/utils';
 
-async function main(config: any) {
+export async function startTelegram(config: any) {
     try {
         const adapter = new TelegramAdapter(config);
 
@@ -24,8 +24,4 @@ async function main(config: any) {
         process.exit(1);
     }
 }
-
-main().catch(error => {
-    Logger.error('Unhandled error in Telegram process:', error);
-    process.exit(1);
-});
+ 

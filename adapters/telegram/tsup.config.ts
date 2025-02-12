@@ -13,5 +13,5 @@ export default defineConfig({
     },
     sourcemap: true,
     clean: true,
-    external: ['@hiveai/utils', '@hiveai/messaging']
+    external: ['@hiveai/utils']
 }); 
