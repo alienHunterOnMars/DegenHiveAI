@@ -1,8 +1,8 @@
 import type { Comment, PrivateMessage, Submission } from 'snoowrap';
 import Snoowrap from 'snoowrap';
 import { EventEmitter } from 'events';
-import { Logger } from '@hiveai/utils';
-import { MessageBroker, CrossClientMessage } from '@hiveai/messaging';
+import { Logger, RedisClient, RedisMessage, REDIS_CHANNELS } from '@hiveai/utils';
+import { v4 as uuid } from 'uuid';
 import { RedditMessageHandler } from './handlers/messageHandler';
 import { RedditPostHandler } from './handlers/postHandler';
 import { RedditConfig, RedditPost } from './types';
@@ -21,7 +21,7 @@ export class RedditAdapter extends EventEmitter {
     private messageHandler: RedditMessageHandler;
     private postHandler: RedditPostHandler;
     private config: RedditConfig;
-    private messageBroker?: MessageBroker;
+    private redisClient: RedisClient;
     private pollInterval!: NodeJS.Timeout;
 
     constructor(config: RedditConfig) {
@@ -37,6 +37,9 @@ export class RedditAdapter extends EventEmitter {
             password: config.password
         });
 
+        // Initialize Redis client
+        this.redisClient = new RedisClient({ url: config.redis_url });
+
         // Initialize handlers
         this.messageHandler = new RedditMessageHandler(this.client);
         this.postHandler = new RedditPostHandler(this.client);
@@ -50,52 +53,115 @@ export class RedditAdapter extends EventEmitter {
             debug: process.env.NODE_ENV === 'development'
         });
     }
-
-    private async handleCrossClientMessage(message: CrossClientMessage): Promise<void> {
-        if (!this.messageBroker) return;
-
+ 
+ 
+    private async handleRedditPost(post: Submission): Promise<void> {
         try {
-            switch (message.type) {
-                case 'MESSAGE':
-                    await this.handleIncomingMessage(message);
-                    break;
-                case 'ALERT':
-                    await this.handleAlert(message);
-                    break;
-                case 'NOTIFICATION':
-                    await this.handleNotification(message);
-                    break;
-                case 'COMMAND':
-                    await this.handleCommand(message);
-                    break;
-            }
+            await this.redisClient.publish(REDIS_CHANNELS.SOCIAL_INBOUND, {
+                id: uuid(),
+                timestamp: Date.now(),
+                type: 'SOCIAL',
+                source: 'reddit',
+                payload: {
+                    postId: post.id,
+                    subreddit: post.subreddit.display_name,
+                    title: post.title,
+                    text: post.selftext,
+                    author: post.author.name,
+                    type: 'post'
+                }
+            });
+            Logger.info('Published Reddit post to Redis:', post.id);
         } catch (error) {
-            Logger.error('Error handling cross-client message:', error);
+            Logger.error('Error publishing Reddit post to Redis:', error);
         }
     }
 
-    private async handleIncomingMessage(message: CrossClientMessage): Promise<void> {
-        // Handle cross-platform messages, maybe post to specific subreddits
+    private async handleRedditComment(comment: Comment): Promise<void> {
+        try {
+            await this.redisClient.publish(REDIS_CHANNELS.SOCIAL_INBOUND, {
+                id: uuid(),
+                timestamp: Date.now(),
+                type: 'SOCIAL',
+                source: 'reddit',
+                payload: {
+                    commentId: comment.id,
+                    postId: comment.link_id,
+                    text: comment.body,
+                    author: comment.author.name,
+                    subreddit: comment.subreddit.display_name,
+                    type: 'comment'
+                }
+            });
+            Logger.info('Published Reddit comment to Redis:', comment.id);
+        } catch (error) {
+            Logger.error('Error publishing Reddit comment to Redis:', error);
+        }
     }
 
-    private async handleAlert(message: CrossClientMessage): Promise<void> {
-        // Handle alerts from other platforms
+    private async handleRedditMessage(message: PrivateMessage): Promise<void> {
+        try {
+            await this.redisClient.publish(REDIS_CHANNELS.SOCIAL_INBOUND, {
+                id: uuid(),
+                timestamp: Date.now(),
+                type: 'SOCIAL',
+                source: 'reddit',
+                payload: {
+                    messageId: message.id,
+                    text: message.body,
+                    author: message.author.name,
+                    type: 'message'
+                }
+            });
+            Logger.info('Published Reddit message to Redis:', message.id);
+        } catch (error) {
+            Logger.error('Error publishing Reddit message to Redis:', error);
+        }
     }
 
-    private async handleNotification(message: CrossClientMessage): Promise<void> {
-        // Handle notifications from other platforms
-    }
+    private async handleIncomingRedisMessage(message: RedisMessage): Promise<void> {
+        try {
+            Logger.info("Reddit Adapter :: handleIncomingRedisMessage", message);
 
-    private async handleCommand(message: CrossClientMessage): Promise<void> {
-        // Handle cross-platform commands
+            if (message.type !== 'SOCIAL' || !message.payload) {
+                return;
+            }
+
+            switch (message.payload.type) {
+                case 'post':
+                    await this.postHandler.submitPost({
+                        subreddit: message.payload.subreddit,
+                        title: message.payload.title || 'New Post',
+                        content: message.payload.text,
+                        type: 'text'
+                    });
+                    break;
+                case 'comment':
+                    if (message.payload.postId) {
+                        await this.replyToComment(message.payload.postId, message.payload.text);
+                    }
+                    break;
+                case 'message':
+                    // Handle private messages if needed
+                    break;
+                default:
+                    Logger.warn('Unknown message type:', message.payload.type);
+            }
+        } catch (error) {
+            Logger.error('Error handling Redis message:', error);
+        }
     }
 
     async start(): Promise<void> {
         try {
-            // Connect to RabbitMQ if configured
-            if (this.messageBroker) {
-                await this.messageBroker.connect();
-            }
+     
+            // Subscribe to Redis messages
+            await this.redisClient.subscribe(REDIS_CHANNELS.SOCIAL_OUTBOUND, 
+                async (message: RedisMessage) => {
+                    if (message.source !== 'reddit') {
+                        await this.handleIncomingRedisMessage(message);
+                    }
+            });
 
             // Verify credentials
             const me = await Promise.resolve(this.client.getMe() as any);
@@ -155,6 +221,7 @@ export class RedditAdapter extends EventEmitter {
             // Process messages sequentially with delay
             for (const message of messages) {
                 await this.messageHandler.handleMessage(message);
+                await this.handleRedditMessage(message);
                 await this.sleep(RedditAdapter.REQUEST_DELAY);
             }
 
@@ -182,8 +249,9 @@ export class RedditAdapter extends EventEmitter {
             this.lastPollTimestamps.mentions = Date.now();
             const messages = await this.client.getUnreadMessages({ limit: RedditAdapter.MAX_ITEMS_PER_REQUEST });
             
-            const mentions = messages.filter(
-                (message): message is any => 
+            const mentions = (messages as any[]).filter(
+                (message): message is Comment => 
+                    message.was_comment &&
                     'body' in message && 
                     'author' in message && 
                     'parent_id' in message
@@ -191,7 +259,8 @@ export class RedditAdapter extends EventEmitter {
 
             // Process mentions sequentially with delay
             for (const mention of mentions) {
-                await this.messageHandler.handleMention(mention as any);
+                await this.messageHandler.handleMention(mention);
+                await this.handleRedditComment(mention);
                 await this.sleep(RedditAdapter.REQUEST_DELAY);
             }
 
@@ -224,6 +293,7 @@ export class RedditAdapter extends EventEmitter {
                 // Process posts sequentially with delay
                 for (const post of newPosts) {
                     await this.postHandler.handleNewPost(post);
+                    await this.handleRedditPost(post);
                     await this.sleep(RedditAdapter.REQUEST_DELAY);
                 }
             }
@@ -249,9 +319,7 @@ export class RedditAdapter extends EventEmitter {
     }
 
     async stop(): Promise<void> {
-        if (this.messageBroker) {
-            await this.messageBroker.disconnect();
-        }
+        await this.redisClient.disconnect();
         clearInterval(this.pollInterval);
         this.lastPollTimestamps = { messages: 0, mentions: 0, subreddits: 0 };
         Logger.info('Reddit adapter stopped');

@@ -8,10 +8,7 @@ export interface RedditConfig {
     monitoredSubreddits: string[];
     autoReplyEnabled: boolean;
     postApprovalRequired: boolean;
-    messageBroker?: {
-        url: string;
-        exchange: string;
-    };
+    redis_url: string;
 }
 
 export interface RedditPost {

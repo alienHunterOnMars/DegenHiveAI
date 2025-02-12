@@ -14,21 +14,24 @@
             }
         }
     },
-    "files": ["dist"],
+    "files": [
+        "dist"
+    ],
     "scripts": {
-		"build": "tsup",
-		"dev": "tsup --watch",
-		"test": "vitest run",
-		"test:coverage": "vitest run --coverage"
+        "build": "tsup",
+        "dev": "tsup --watch",
+        "test": "vitest run",
+        "test:coverage": "vitest run --coverage"
     },
     "dependencies": {
-        "@hiveai/messaging": "workspace:*",
         "@hiveai/utils": "workspace:*",
-        "snoowrap": "^1.23.0"
+        "@types/uuid": "^10.0.0",
+        "snoowrap": "^1.23.0",
+        "uuid": "^11.0.5"
     },
     "devDependencies": {
         "@types/node": "^20.0.0",
         "tsup": "8.3.5",
         "typescript": "^5.0.0"
     }
-} 
+}

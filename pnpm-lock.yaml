@@ -231,9 +231,15 @@ importers:
       '@hiveai/utils':
         specifier: workspace:*
         version: link:../../utils
+      '@types/uuid':
+        specifier: ^10.0.0
+        version: 10.0.0
       snoowrap:
         specifier: ^1.23.0
         version: 1.23.0(bufferutil@4.0.9)(utf-8-validate@5.0.10)
+      uuid:
+        specifier: ^11.0.5
+        version: 11.0.5
     devDependencies:
       '@types/node':
         specifier: ^20.0.0
@@ -284,9 +290,6 @@ importers:
 
   adapters/twitter:
     dependencies:
-      '@hiveai/messaging':
-        specifier: workspace:*
-        version: link:../../messaging
       '@hiveai/utils':
         specifier: workspace:*
         version: link:../../utils
