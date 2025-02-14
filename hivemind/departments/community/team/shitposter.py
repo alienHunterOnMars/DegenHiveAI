@@ -13,3 +13,21 @@ Industry Knowledge: Familiar with crypto, blockchain, and NFT terminology; under
 Skills: Strong writing skills, creativity, and the ability to simplify complex technical updates into engaging content.
 Attributes: Creative, adaptable, and fun-loving.
 """
+
+from hivemind.algorithm.templates.Role import Role
+
+class Shitposter(Role):
+    name: str = "Community/Shitposter"
+    profile: str = "Shitposter"
+    goal: str = "Generate engaging, timely content (e.g., “alpha” updates, project progress summaries, fun memes, and banter posts) tailored for the community."
+    constraints: str = "make sure the financial model is accurate and realistic"
+
+
+    def __init__(self, **kwargs) -> None:
+        super().__init__(**kwargs)
+        self.role = "Shitposter AI"
+
+        # Initialize actions specific to the Shitposter role
+        self.set_actions([])
+        # Set events or actions the Shitposter should watch or be aware of
+        self._watch({})

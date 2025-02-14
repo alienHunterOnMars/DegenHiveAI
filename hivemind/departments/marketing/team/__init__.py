@@ -1,11 +1,10 @@
-from .search import SearchAgent
-from .writer import WriterAgent
-from .critique import CritiqueAgent
-from .designer import DesignerAgent
-
+from .CMO import CMO
+from .creator import Creator
+from .manager import Manager
+from .outreach import Outreach
+from .analyst import Analyst
 
 """
-eam Overview
 Team Size: A lean marketing team of 5 key roles should be sufficient initially.
 Collaboration: These roles must work closely together to ensure a unified brand presence across all official accounts (DegenHive, HiveMindAI, and the founder’s). Coordination with external partners, community managers, and other internal teams (like Partnerships or Product) is essential.
 Focus Areas:
@@ -16,4 +15,4 @@ Culture & Tone: The overall tone should be futuristic, playful, and in line with
 Each AI agent in this marketing team will have a clear mandate, qualifications, and well-defined tasks that contribute to building a strong, cohesive brand and increasing community reach for DegenHive and its associated platforms.
 """
 
-__all__ = ["SearchAgent", "WriterAgent", "CritiqueAgent", "DesignerAgent"]
+__all__ = ["CMO", "Creator", "Manager", "Outreach", "Analyst"]

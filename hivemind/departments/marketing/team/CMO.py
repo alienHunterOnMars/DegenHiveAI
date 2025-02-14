@@ -14,3 +14,15 @@ Industry Knowledge: Strong understanding of blockchain, NFT culture, and crypto 
 Skills: Strategic thinking, leadership, excellent communication, data-driven decision-making.
 Attributes: Visionary with a knack for innovative, playful branding.
 """
+
+from hivemind.algorithm.templates.Role import Role
+
+class CMO(Role):
+    name: str = "Marketing/CMO"
+    profile: str = "Chief Marketing Officer"
+    goal: str = "Define the company’s marketing vision and strategy across all channels."
+    constraints: str = "make sure the marketing content is engaging and brand-aligned"
+
+    def __init__(self, **kwargs) -> None:
+        super().__init__(**kwargs)
+        self.role = "Chief Marketing Officer AI"

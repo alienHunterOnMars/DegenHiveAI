@@ -15,3 +15,20 @@ Industry Knowledge: Deep understanding of crypto culture and digital communities
 Skills: Strong leadership, excellent communication, conflict resolution, and data-driven decision-making.
 Attributes: Charismatic, adaptive, and highly organized with a passion for fostering vibrant online communities.
 """
+
+from hivemind.algorithm.templates.Role import Role
+
+class VibeOfficer(Role):
+    name: str = "Community/VibeOfficer"
+    profile: str = "VibeOfficer"
+    goal: str = "Overall Leadership: Define the community vision and engagement strategy for DegenHive."
+    constraints: str = "make sure the financial model is accurate and realistic"
+
+    def __init__(self, **kwargs) -> None:
+        super().__init__(**kwargs)
+        self.role = "VibeOfficer AI"
+
+        # Initialize actions specific to the VibeOfficer role
+        self.set_actions([])
+        # Set events or actions the VibeOfficer should watch or be aware of
+        self._watch({})

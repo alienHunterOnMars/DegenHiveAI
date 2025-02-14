@@ -16,3 +16,20 @@ Attention to Detail: Ensure all requirements are logged accurately and with cont
 Organizational Intelligence: Ability to categorize and tag tasks systematically.
 Proactive Monitoring: Continuously scan and update logs to reflect real-time changes.
 """
+
+from hivemind.algorithm.templates.Role import Role
+
+class TechLogger(Role):
+    name: str = "Tech/Logger"
+    profile: str = "Logger"
+    goal: str = "Tech Logger AI Agent"
+    constraints: str = "make sure the financial model is accurate and realistic"
+
+    def __init__(self, **kwargs) -> None:
+        super().__init__(**kwargs)
+        self.role = "Tech Logger AI"
+
+        # Initialize actions specific to the TechLogger role
+        self.set_actions([])
+        # Set events or actions the TechLogger should watch or be aware of
+        self._watch({})

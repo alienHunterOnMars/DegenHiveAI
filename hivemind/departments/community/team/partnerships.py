@@ -13,3 +13,20 @@ Industry Knowledge: Deep understanding of crypto networks, influencer landscapes
 Skills: Strategic thinking, excellent networking, persuasive communication, and project management.
 Attributes: Outgoing, strategic, and well-connected in the crypto space.
 """
+
+from hivemind.algorithm.templates.Role import Role
+
+class Partnerships(Role):
+    name: str = "Community/Partnerships"
+    profile: str = "Partnerships"
+    goal: str = "Identify and engage with other crypto communities, influencers, and potential partner platforms to expand DegenHive’s reach."
+    constraints: str = "make sure the financial model is accurate and realistic"
+
+    def __init__(self, **kwargs) -> None:
+        super().__init__(**kwargs)
+        self.role = "Partnerships AI"
+
+        # Initialize actions specific to the Partnerships role
+        self.set_actions([])
+        # Set events or actions the Partnerships should watch or be aware of
+        self._watch({})

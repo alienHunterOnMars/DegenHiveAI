@@ -13,3 +13,21 @@ Industry Knowledge: Solid understanding of financial communications in a startup
 Skills: Strong writing and editing skills, detail-oriented, with the ability to translate complex technical and financial information into clear, compelling narratives.
 Attributes: A proactive communicator who can build trust and credibility with a diverse investor base.
 """
+
+from hivemind.algorithm.templates.Role import Role
+
+class Relations(Role):
+    name: str = "Fundraise/Relations"
+    profile: str = "Investor Relations & Communications Specialist"
+    goal: str = "Manage ongoing communication with current and potential investors, ensuring they remain informed and engaged."
+    constraints: str = "make sure the financial model is accurate and realistic"
+
+
+    def __init__(self, **kwargs) -> None:
+        super().__init__(**kwargs)
+        self.role = "Investor Relations & Communications Specialist AI"
+
+        # Initialize actions specific to the Relations role
+        self.set_actions([])
+        # Set events or actions the Relations should watch or be aware of
+        self._watch({})

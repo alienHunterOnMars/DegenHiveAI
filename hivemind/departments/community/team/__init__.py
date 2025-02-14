@@ -1,7 +1,8 @@
-from .search import SearchAgent
-from .writer import WriterAgent
-from .critique import CritiqueAgent
-from .designer import DesignerAgent
+from .alphaLeaker import AlphaLeaker
+from .moderator import Moderator
+from .partnerships import Partnerships
+from .shitposter import Shitposter
+from .vibeOfficer import VibeOfficer
 
 
 """
@@ -19,4 +20,4 @@ Each role’s performance (e.g., engagement metrics, event participation rates, 
 By structuring your community team with these clearly defined roles and responsibilities, you ensure that DegenHive’s community remains vibrant, informed, and continuously growing—key for sustaining interest in your crypto DEX, liquid staking protocol, and the unique ecosystem powered by DragonBee NFTs.
 """
 
-__all__ = ["SearchAgent", "WriterAgent", "CritiqueAgent", "DesignerAgent"]
+__all__ = ["AlphaLeaker", "Moderator", "Partnerships", "Shitposter", "VibeOfficer"]

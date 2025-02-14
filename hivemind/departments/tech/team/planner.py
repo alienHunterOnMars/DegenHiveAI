@@ -17,3 +17,20 @@ Analytical Thinking: Ability to break down complex requirements into manageable 
 Clear Communication: Produce human-like, detailed documentation that clearly explains technical solutions.
 Agility: Work on tasks sequentially, ensuring one task is fully planned before moving on to the next.
 """
+
+from hivemind.algorithm.templates.Role import Role
+
+class Planner(Role):
+    name: str = "Tech/Planner"
+    profile: str = "Planner"
+    goal: str = "Planner AI Agent"
+    constraints: str = "make sure the financial model is accurate and realistic"
+
+    def __init__(self, **kwargs) -> None:
+        super().__init__(**kwargs)
+        self.role = "Planner AI"
+
+        # Initialize actions specific to the Planner role
+        self.set_actions([])
+        # Set events or actions the Planner should watch or be aware of
+        self._watch({})

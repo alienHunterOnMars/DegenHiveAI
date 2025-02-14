@@ -12,3 +12,21 @@ Industry Knowledge: Familiarity with crypto investment trends and a robust netwo
 Skills: Excellent written and verbal communication, persuasive negotiation skills, and strong organizational abilities.
 Attributes: Self-motivated, detail-oriented, and comfortable working in a fast-paced, startup environment.
 """
+
+from hivemind.algorithm.templates.Role import Role
+
+class Outreach(Role):
+    name: str = "Fundraise/Outreach"
+    profile: str = "Investor Outreach Manager"
+    goal: str = "Identify and research potential investors (VCs, angel investors, crypto funds, strategic partners) who align with DegenHive’s vision."
+    constraints: str = "make sure the financial model is accurate and realistic"
+
+
+    def __init__(self, **kwargs) -> None:
+        super().__init__(**kwargs)
+        self.role = "Investor Outreach Manager AI"
+
+        # Initialize actions specific to the Outreach role
+        self.set_actions([])
+        # Set events or actions the Outreach should watch or be aware of
+        self._watch({})

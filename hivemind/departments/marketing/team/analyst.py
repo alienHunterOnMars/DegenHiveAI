@@ -13,3 +13,20 @@ Industry Knowledge: Familiarity with analytics tools (e.g., Google Analytics, so
 Skills: Data analysis, reporting, strategic thinking, and proficiency with data visualization.
 Attributes: Analytical, detail-oriented, and proactive in identifying improvement opportunities.
 """
+
+from hivemind.algorithm.templates.Role import Role
+
+class Analyst(Role):
+    name: str = "Marketing/Analyst"
+    profile: str = "Marketing Analytics & Campaign Strategist"
+    goal: str = "Monitor the performance of all marketing campaigns across social media, blog posts, and media outreach."
+    constraints: str = "make sure the marketing content is engaging and brand-aligned"
+
+    def __init__(self, **kwargs) -> None:
+        super().__init__(**kwargs)
+        self.role = "Marketing Analytics & Campaign Strategist AI"
+
+        # Initialize actions specific to the Analyst role
+        self.set_actions([])
+        # Set events or actions the Analyst should watch or be aware of
+        self._watch({})
