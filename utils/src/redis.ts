@@ -3,21 +3,45 @@ import Redis from 'ioredis';
 import { Logger } from '@hiveai/utils';
 import { EventEmitter } from 'events';
 
+/// ** type
+/// INTERNAL: Internal messages for internal use only
+/// INTERACTION: Messages from users (tg, discord, reddit, farcaster, twitter) to the system
+/// TRANSACTION: Messages to execute transactions (via tg) 
+/// NOTIFICATION: Messages from the system to the user
+/// ALERT: Messages from the system to the user 
+/// TELEGRAM: Messages to the Telegram adapter from the system
+/// DISCORD: Messages to the Discord adapter from the system
+/// REDDIT: Messages to the Reddit adapter from the system
+/// FARCASTER: Messages to the Farcaster adapter from the system
+/// TWITTER: Messages to the Twitter adapter from the system
+
 export interface RedisMessage {
   id: string;
   timestamp: number;
-  type: 'SOCIAL' | 'TRANSACTION' | 'NOTIFICATION' | 'ALERT';
+  type: 'INTERNAL' | 'INTERACTION' | 'TRANSACTION' | 'NOTIFICATION' | 'ALERT' | 'TELEGRAM' | 'DISCORD' | 'REDDIT' | 'FARCASTER' | 'TWITTER';
   source: string;
+  destination: string;
   payload: any;
 }
 
+
+
+
+
+
 export const REDIS_CHANNELS = {
+  INTERNAL: 'INTERNAL',
   SOCIAL_INBOUND: 'social:inbound',
   SOCIAL_OUTBOUND: 'social:outbound', 
   TRANSACTIONS: 'transactions:requests',
   TRANSACTION_STATUS: 'transactions:status',
   NOTIFICATIONS: 'notifications',
-  ALERTS: 'alerts'
+  ALERTS: 'alerts',
+  TELEGRAM: 'TELEGRAM',
+  DISCORD: 'DISCORD',
+  REDDIT: 'REDDIT',
+  FARCASTER: 'FARCASTER',
+  TWITTER: 'TWITTER'
 };
 
 export class RedisClient extends EventEmitter {

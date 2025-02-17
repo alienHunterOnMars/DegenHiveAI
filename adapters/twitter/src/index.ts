@@ -114,7 +114,8 @@ export class TwitterAdapter extends EventEmitter {
             await this.redisClient.publish(REDIS_CHANNELS.SOCIAL_INBOUND, {
                 id: uuid(),
                 timestamp: Date.now(),
-                type: 'SOCIAL',
+                type: 'INTERNAL',
+                destination: 'twitter',
                 source: 'twitter',
                 payload: {
                     tweetId: tweet.id,
@@ -136,7 +137,8 @@ export class TwitterAdapter extends EventEmitter {
             await this.redisClient.publish(REDIS_CHANNELS.SOCIAL_INBOUND, {
                 id: uuid(),
                 timestamp: Date.now(),
-                type: 'SOCIAL',
+                type: 'INTERNAL',
+                destination: 'twitter',
                 source: 'twitter',
                 payload: {
                     tweetId: tweet.id,
@@ -157,7 +159,7 @@ export class TwitterAdapter extends EventEmitter {
         try {
             Logger.info("Twitter Adapter :: handleIncomingRedisMessage", message);
 
-            if (message.type !== 'SOCIAL' || !message.payload) {
+            if (message.type !== 'INTERNAL' || !message.payload) {
                 return;
             }
 

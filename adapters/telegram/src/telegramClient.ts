@@ -58,9 +58,9 @@ export class TelegramClient {
         await this.bot.launch();
 
         // Subscribe to outbound messages from other processes
-        await this.redisClient.subscribe( REDIS_CHANNELS.SOCIAL_OUTBOUND, 
+        await this.redisClient.subscribe( REDIS_CHANNELS.TELEGRAM, 
               async (message: RedisMessage) => {
-                if (message.source === 'telegram') {
+                if (message.destination === 'telegram') {
                   await this.sendMessage(
                     message.payload.chatId,
                     message.payload.text,

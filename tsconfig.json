@@ -24,7 +24,6 @@
     "exclude": ["node_modules", "dist", "**/*.test.ts"],
     "references": [
         { "path": "./utils" },
-        { "path": "./messaging" },
         { "path": "./plugins/trustdb" },
         { "path": "./plugins/solana" },
         { "path": "./plugins/sui" },

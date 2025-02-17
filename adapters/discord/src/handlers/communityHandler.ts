@@ -283,8 +283,9 @@ export class CommunityHandler {
         await redisClient.publish(REDIS_CHANNELS.SOCIAL_INBOUND, {
             id: uuid(),
             timestamp: Date.now(),
-            type: 'SOCIAL',
+            type: 'INTERNAL',
             source: 'discord',
+            destination: 'discord',
             payload: {
                 message: message.content
             }

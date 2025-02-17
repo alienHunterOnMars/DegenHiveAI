@@ -152,13 +152,13 @@ class HiveSwarm {
             });
 
             // Start discord process
-            await this.processManager.startProcess('discord', './dist/processes/discord.js', {
-                DISCORD_TOKEN: this.config.discord?.token,
-                DISCORD_ANNOUNCEMENT_CHANNEL_ID: this.config.discord?.announcementChannelId,
-                DISCORD_ALPHA_CHANNEL_ID: this.config.discord?.alphaChannelId,
-                DISCORD_MEME_CHANNEL_ID: this.config.discord?.memeChannelId,
-                REDIS_URL: this.config.redis_url
-            });
+            // await this.processManager.startProcess('discord', './dist/processes/discord.js', {
+            //     DISCORD_TOKEN: this.config.discord?.token,
+            //     DISCORD_ANNOUNCEMENT_CHANNEL_ID: this.config.discord?.announcementChannelId,
+            //     DISCORD_ALPHA_CHANNEL_ID: this.config.discord?.alphaChannelId,
+            //     DISCORD_MEME_CHANNEL_ID: this.config.discord?.memeChannelId,
+            //     REDIS_URL: this.config.redis_url
+            // });
  
 
             // Start blockchain process

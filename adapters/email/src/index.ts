@@ -108,7 +108,7 @@ export class EmailAdapter extends EventEmitter {
         try {
             Logger.info("Email Adapter :: handleIncomingRedisMessage", message);
 
-            if (message.type !== 'SOCIAL' || !message.payload) {
+            if (message.type !== 'INTERNAL' || !message.payload) {
                 return;
             }
 
@@ -159,7 +159,8 @@ export class EmailAdapter extends EventEmitter {
                                 await this.redisClient.publish(REDIS_CHANNELS.SOCIAL_INBOUND, {
                                     id: uuid(),
                                     timestamp: Date.now(),
-                                    type: 'SOCIAL',
+                                    type: 'INTERNAL',
+                                    destination: 'email',
                                     source: 'email',
                                     payload: {
                                         type: 'email',

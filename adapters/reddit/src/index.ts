@@ -60,7 +60,8 @@ export class RedditAdapter extends EventEmitter {
             await this.redisClient.publish(REDIS_CHANNELS.SOCIAL_INBOUND, {
                 id: uuid(),
                 timestamp: Date.now(),
-                type: 'SOCIAL',
+                type: 'INTERNAL',
+                destination: 'reddit',
                 source: 'reddit',
                 payload: {
                     postId: post.id,
@@ -82,7 +83,8 @@ export class RedditAdapter extends EventEmitter {
             await this.redisClient.publish(REDIS_CHANNELS.SOCIAL_INBOUND, {
                 id: uuid(),
                 timestamp: Date.now(),
-                type: 'SOCIAL',
+                type: 'INTERNAL',
+                destination: 'reddit',
                 source: 'reddit',
                 payload: {
                     commentId: comment.id,
@@ -104,7 +106,8 @@ export class RedditAdapter extends EventEmitter {
             await this.redisClient.publish(REDIS_CHANNELS.SOCIAL_INBOUND, {
                 id: uuid(),
                 timestamp: Date.now(),
-                type: 'SOCIAL',
+                type: 'INTERNAL',
+                destination: 'reddit',
                 source: 'reddit',
                 payload: {
                     messageId: message.id,
@@ -123,7 +126,7 @@ export class RedditAdapter extends EventEmitter {
         try {
             Logger.info("Reddit Adapter :: handleIncomingRedisMessage", message);
 
-            if (message.type !== 'SOCIAL' || !message.payload) {
+            if (message.type !== 'INTERNAL' || !message.payload) {
                 return;
             }
 

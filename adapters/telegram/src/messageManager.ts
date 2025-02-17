@@ -46,11 +46,12 @@ export class MessageManager {
 
       if (!ctx.chat) return;
 
-      await redisClient.publish(REDIS_CHANNELS.SOCIAL_INBOUND, {
+      await redisClient.publish(REDIS_CHANNELS.INTERNAL, {
         id: uuid(),
         timestamp: Date.now(),
-        type: 'SOCIAL',
+        type: 'INTERNAL',
         source: 'telegram',
+        destination: 'telegram',
         payload: {
           chatId: ctx.chat.id,
           text: messageText,

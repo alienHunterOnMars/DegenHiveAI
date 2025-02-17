@@ -136,8 +136,9 @@ export class FarcasterAdapter extends EventEmitter {
             await this.redisClient.publish(REDIS_CHANNELS.SOCIAL_INBOUND, {
                 id: uuid(),
                 timestamp: Date.now(),
-                type: 'SOCIAL',
+                type: 'INTERNAL',
                 source: 'farcaster',
+                destination: 'farcaster',
                 payload: {
                     castId: cast.hash,
                     text: cast.text,
@@ -158,7 +159,7 @@ export class FarcasterAdapter extends EventEmitter {
         try {
             Logger.info("Farcaster Adapter :: handleIncomingRedisMessage", message);
 
-            if (message.type !== 'SOCIAL' || !message.payload) {
+            if (message.type !== 'INTERNAL' || !message.payload) {
                 return;
             }
 
