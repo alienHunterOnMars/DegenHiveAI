@@ -22,17 +22,19 @@ export class TelegramAdapter extends EventEmitter {
 
     constructor(config: TelegramClientOptions) {
         super();
-
+        Logger.info('Initializing TelegramAdapter...');
         this.config = config;
         this.client = new TelegramClient(config);
+        Logger.info('TelegramAdapter initialized');
     }
 
     async start(): Promise<void> {
         try {
+            Logger.info('Starting TelegramAdapter...');
             await this.client.start();            
-            Logger.info('Telegram adapter started successfully');
+            Logger.info('TelegramAdapter started successfully');
         } catch (error) {
-            Logger.error('Failed to start Telegram adapter:', error);
+            Logger.error('Failed to start TelegramAdapter:', error);
             throw error;
         }
     }

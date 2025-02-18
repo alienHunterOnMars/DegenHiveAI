@@ -21,65 +21,55 @@ export interface TelegramClientOptions {
 export class TelegramClient {
     private bot: Telegraf;
     private redisClient: RedisClient;
-
     private messageManager: MessageManager;
-    private userManager: UserManager;
-    private tradeManager: TradeManager;
-    private rlManager: RLManager;
-    private memoryManager: MemoryManager;
 
     constructor(config: TelegramClientOptions) {
         this.bot = new Telegraf(config.token);
         this.redisClient = new RedisClient({ url: config.redis_url });
         
-        // Initialize managers
-        this.userManager = new UserManager();
-        this.tradeManager = new TradeManager();
-        this.rlManager = new RLManager();
-        this.memoryManager = new MemoryManager();
-        
         this.messageManager = new MessageManager({
-            bot: this.bot,
-            userManager: this.userManager,
-            tradeManager: this.tradeManager,
-            rlManager: this.rlManager,
-            memoryManager: this.memoryManager,
             founderChatId: config.founderChatId,
             communityChatId: config.communityChatId
         });
-
-        this.setupHandlers();
-    }
-
-    private setupHandlers() {
-        this.bot.on('message', (ctx) => this.messageManager.handleMessage(ctx, this.redisClient));
     }
 
     async start(): Promise<void> {
         try {
-            // Start the bot
-            await this.bot.launch();
+            Logger.info('Starting Telegram client initialization...');
+            
+            // Start the bot with timeout
+            Logger.info('Launching Telegram bot...');
+            // const launchTimeout = new Promise((_, reject) => {
+            //     setTimeout(() => reject(new Error('Telegram bot launch timed out after 15 seconds')), 15000);
+            // });
+
+            this.bot.launch(() => console.log("Bot is starting!"));
+            
+            // await Promise.race([
+            //     this.bot.launch(),
+            //     launchTimeout
+            // ]);
             Logger.info('Telegram bot launched successfully');
 
-            // Initialize Redis connection
-            await this.redisClient.connect();
-            Logger.info('Redis client connected successfully');
+            // Set up message handlers after successful launch
+            Logger.info('Setting up message handlers...');
+            this.bot.on('message', (ctx) => this.messageManager.handleMessage(ctx, this.redisClient));
+            Logger.info('Message handlers set up successfully');
 
-            // Subscribe to the TELEGRAM channel
-            await this.redisClient.subscribe(REDIS_CHANNELS.TELEGRAM, async (message: string) => {
+            // Initialize Redis subscription
+            Logger.info('Setting up Redis subscription...');
+            await this.redisClient.subscribe(REDIS_CHANNELS.TELEGRAM, async (message: RedisMessage) => {
                 try {
-                    // Parse the message
-                    const parsedMessage = JSON.parse(message) as RedisMessage;
-                    Logger.info(`Received message on TELEGRAM channel:`, parsedMessage);
+                    Logger.info(`Received message on TELEGRAM channel:`, message);
 
-                    if (parsedMessage.destination === 'TELEGRAM' && parsedMessage.payload) {
-                        const { chatId, text, options } = parsedMessage.payload;
+                    if (message.destination === REDIS_CHANNELS.TELEGRAM && message.payload) {
+                        const { chatId, text, options } = message.payload;
                         
                         if (chatId && text) {
                             await this.sendMessage(chatId, text, options);
                             Logger.info(`Sent message to Telegram chat ${chatId}`);
                         } else {
-                            Logger.error('Invalid message payload:', parsedMessage.payload);
+                            Logger.error('Invalid message payload:', message.payload);
                         }
                     }
                 } catch (error) {
@@ -87,7 +77,7 @@ export class TelegramClient {
                 }
             });
 
-            Logger.info('Telegram client started and subscribed to Redis channel');
+            Logger.info('Telegram client initialization completed');
         } catch (error) {
             Logger.error('Error starting Telegram client:', error);
             throw error;

@@ -87,6 +87,8 @@ export class RedisClient extends EventEmitter {
       Logger.info(`Subscribed to channel: ${channel}`);
 
       this.subscriber.on('message', async (chan, message) => {
+        console.log('chan', chan);
+        console.log('message', message);
         if (chan === channel) {
           try {
             const parsedMessage = JSON.parse(message) as RedisMessage;

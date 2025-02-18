@@ -16,11 +16,6 @@ import { IMemoryManager } from "./memoryManager";
 import { v4 as uuid } from 'uuid';
 
 interface MessageManagerOptions {
-  bot: Telegraf<Context>;
-  userManager: IUserManager;
-  tradeManager: ITradeManager;
-  rlManager: IRLManager;
-  memoryManager: IMemoryManager;
   founderChatId: string;
   communityChatId: string;
 }
@@ -47,10 +42,10 @@ export class MessageManager {
       if (!telegramUserId) return;
 
       // Check if this is the user's first interaction
-      if (await this.options.userManager.isFirstTime(telegramUserId)) {
-        await this.sendWelcomeMessage(ctx);
-        // return;
-      }
+      // if (await this.options.userManager.isFirstTime(telegramUserId)) {
+      //   await this.sendWelcomeMessage(ctx);
+      //   // return;
+      // }
 
       if (!ctx.chat) return;
 
@@ -83,24 +78,24 @@ export class MessageManager {
 
  
       // Update contextual memory (RAG) for the chat
-      await this.options.memoryManager.updateMemory(telegramUserId, messageText);
+      // await this.options.memoryManager.updateMemory(telegramUserId, messageText);
 
       // Determine if the message is a trade command
-      if (this.isTradeCommand(messageText)) {
-        const tradeOrder = this.parseTradeOrder(messageText);
-        if (tradeOrder) {
-          // Determine fee based on connection (0.0% if linked, otherwise 0.1%)
-          const feeRate = await this.options.userManager.getFeeRate(telegramUserId);
-          tradeOrder.feeRate = feeRate;
-          const tradeResult = await this.options.tradeManager.executeTrade(tradeOrder);
-          await ctx.reply(`Trade executed: ${tradeResult}`);
-          return;
-        }
-      }
+      // if (this.isTradeCommand(messageText)) {
+      //   const tradeOrder = this.parseTradeOrder(messageText);
+      //   if (tradeOrder) {
+      //     // Determine fee based on connection (0.0% if linked, otherwise 0.1%)
+      //     const feeRate = await this.options.userManager.getFeeRate(telegramUserId);
+      //     tradeOrder.feeRate = feeRate;
+      //     const tradeResult = await this.options.tradeManager.executeTrade(tradeOrder);
+      //     await ctx.reply(`Trade executed: ${tradeResult}`);
+      //     return;
+      //   }
+      // }
 
       // Otherwise, process as a dragonbee interaction
-      const response = await this.options.rlManager.generateResponse(telegramUserId, messageText);
-      await ctx.reply(response);
+      // const response = await this.options.rlManager.generateResponse(telegramUserId, messageText);
+      // await ctx.reply(response);
     } catch (error) {
       Logger.error("Error processing message:", error);
     }

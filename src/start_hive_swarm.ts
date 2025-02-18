@@ -62,29 +62,48 @@ class ProcessManager {
 
     async startProcess(name: string, scriptPath: string, env: any = {}): Promise<void> {
         try {
-            const process = fork(scriptPath, [], {
+            
+            const process: any = fork(scriptPath, [], {
                 env: env,
                 stdio: ['inherit', 'inherit', 'inherit', 'ipc']
             });
 
-            process.on('message', (message) => {
-                Logger.info(`Message from ${name}:`, message);
-            });
+            // Create a promise that resolves when the process is ready
+            const readyPromise = new Promise<void>((resolve, reject) => {
+                const timeout = setTimeout(() => {
+                    reject(new Error(`Process ${name} failed to initialize within 30 seconds`));
+                }, 30000);
 
-            process.on('error', (error) => {
-                Logger.error(`Process ${name} error:`, error);
-                this.restartProcess(name, scriptPath, env);
-            });
+                process.on('message', (message: any) => {
+                    if (message.type === 'ready') {
+                        clearTimeout(timeout);
+                        Logger.info(`Process ${name} initialized successfully`);
+                        resolve();
+                    }
+                    Logger.info(`Message from ${name}:`, message);
+                });
 
-            process.on('exit', (code) => {
-                if (code !== 0) {
-                    Logger.error(`Process ${name} exited with code ${code}`);
-                    this.restartProcess(name, scriptPath, env);
-                }
+                process.on('error', (error: any) => {
+                    clearTimeout(timeout);
+                    Logger.error(`Process ${name} error:`, error);
+                    reject(error);
+                });
+
+                process.on('exit', (code: any) => {
+                    if (code !== 0) {
+                        clearTimeout(timeout);
+                        const error = new Error(`Process ${name} exited with code ${code}`);
+                        Logger.error(error.message);
+                        reject(error);
+                    }
+                });
             });
 
             this.processes.set(name, process);
             Logger.info(`Started process: ${name}`);
+
+            // Wait for the process to be ready
+            await readyPromise;
         } catch (error) {
             Logger.error(`Failed to start process ${name}:`, error);
             throw error;
