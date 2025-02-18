@@ -21,10 +21,18 @@ interface MessageManagerOptions {
   tradeManager: ITradeManager;
   rlManager: IRLManager;
   memoryManager: IMemoryManager;
+  founderChatId: string;
+  communityChatId: string;
 }
 
 export class MessageManager {
-  constructor(private options: MessageManagerOptions) {}
+  private founderChatId: string;
+  private communityChatId: string;
+
+  constructor(private options: MessageManagerOptions) {
+    this.founderChatId = options.founderChatId;
+    this.communityChatId = options.communityChatId;
+  }
 
   // Main entry: process incoming message
   public async handleMessage(ctx: Context, redisClient: RedisClient): Promise<void> {
@@ -46,20 +54,34 @@ export class MessageManager {
 
       if (!ctx.chat) return;
 
-      await redisClient.publish(REDIS_CHANNELS.INTERNAL, {
-        id: uuid(),
-        timestamp: Date.now(),
-        type: 'INTERNAL',
-        source: 'telegram',
-        destination: 'telegram',
-        payload: {
-          chatId: ctx.chat.id,
-          text: messageText,
-          userId: ctx.from?.id,
-          messageId: ctx.message?.message_id
-        }
-      });
+      // --> If the message is from the founder chat, hivemind's CEO will handle it
+      if ( ctx.from?.id == Number(this.founderChatId)  ) {
+        await redisClient.publish(REDIS_CHANNELS.INTERNAL, {
+          id: uuid(),
+          timestamp: Date.now(),
+          type: 'INTERNAL',
+          source: 'telegram',
+          destination: 'hivemind/ceo',
+          payload: {  chatId: ctx.chat.id,  text: messageText,  userId: ctx.from?.id,  messageId: ctx.message?.message_id   }
+        });
+        return;
+      }
 
+
+      // --> If the message is from the group chat, hivemind's community manager will handle it
+      if ( ctx.chat.id == Number(this.communityChatId) ) {
+        await redisClient.publish(REDIS_CHANNELS.INTERNAL, {
+          id: uuid(),
+          timestamp: Date.now(),
+          type: 'INTERNAL',
+          source: 'telegram',
+          destination: 'hivemind/community',
+          payload: {  chatId: ctx.chat.id,  text: messageText,  userId: ctx.from?.id,  messageId: ctx.message?.message_id   }
+        });
+        return;
+      }
+
+ 
       // Update contextual memory (RAG) for the chat
       await this.options.memoryManager.updateMemory(telegramUserId, messageText);
 

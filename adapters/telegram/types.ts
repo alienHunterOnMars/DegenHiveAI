@@ -1,7 +1,7 @@
 export interface TelegramConfig {
     token: string;
     founderChatId: string;
-    groupChatId: string;
+    communityChatId: string;
     messageBroker?: {
         url: string;
         exchange: string;

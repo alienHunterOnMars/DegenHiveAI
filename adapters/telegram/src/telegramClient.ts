@@ -14,7 +14,7 @@ import { MessageManager } from "./messageManager";
 export interface TelegramClientOptions {
     token: string;
     founderChatId: string;
-    groupChatId: string;
+    communityChatId: string;
     redis_url: string;
 }
 
@@ -29,9 +29,8 @@ export class TelegramClient {
     private memoryManager: MemoryManager;
 
     constructor(config: TelegramClientOptions) {
-
-      this.bot = new Telegraf(config.token);
-      this.redisClient = new RedisClient({ url: config.redis_url });
+        this.bot = new Telegraf(config.token);
+        this.redisClient = new RedisClient({ url: config.redis_url });
         
         // Initialize managers
         this.userManager = new UserManager();
@@ -44,7 +43,9 @@ export class TelegramClient {
             userManager: this.userManager,
             tradeManager: this.tradeManager,
             rlManager: this.rlManager,
-            memoryManager: this.memoryManager
+            memoryManager: this.memoryManager,
+            founderChatId: config.founderChatId,
+            communityChatId: config.communityChatId
         });
 
         this.setupHandlers();
@@ -55,30 +56,61 @@ export class TelegramClient {
     }
 
     async start(): Promise<void> {
-        await this.bot.launch();
+        try {
+            // Start the bot
+            await this.bot.launch();
+            Logger.info('Telegram bot launched successfully');
 
-        // Subscribe to outbound messages from other processes
-        await this.redisClient.subscribe( REDIS_CHANNELS.TELEGRAM, 
-              async (message: RedisMessage) => {
-                if (message.destination === 'telegram') {
-                  await this.sendMessage(
-                    message.payload.chatId,
-                    message.payload.text,
-                    message.payload.options
-                  );
+            // Initialize Redis connection
+            await this.redisClient.connect();
+            Logger.info('Redis client connected successfully');
+
+            // Subscribe to the TELEGRAM channel
+            await this.redisClient.subscribe(REDIS_CHANNELS.TELEGRAM, async (message: string) => {
+                try {
+                    // Parse the message
+                    const parsedMessage = JSON.parse(message) as RedisMessage;
+                    Logger.info(`Received message on TELEGRAM channel:`, parsedMessage);
+
+                    if (parsedMessage.destination === 'TELEGRAM' && parsedMessage.payload) {
+                        const { chatId, text, options } = parsedMessage.payload;
+                        
+                        if (chatId && text) {
+                            await this.sendMessage(chatId, text, options);
+                            Logger.info(`Sent message to Telegram chat ${chatId}`);
+                        } else {
+                            Logger.error('Invalid message payload:', parsedMessage.payload);
+                        }
+                    }
+                } catch (error) {
+                    Logger.error('Error processing Redis message:', error);
                 }
-        });        
+            });
 
-        Logger.info('Telegram client started');
+            Logger.info('Telegram client started and subscribed to Redis channel');
+        } catch (error) {
+            Logger.error('Error starting Telegram client:', error);
+            throw error;
+        }
     }
 
     async stop(): Promise<void> {
-        await this.bot.stop();
-        await this.redisClient.disconnect();
-        Logger.info('Telegram client stopped');
+        try {
+            await this.bot.stop();
+            await this.redisClient.disconnect();
+            Logger.info('Telegram client stopped');
+        } catch (error) {
+            Logger.error('Error stopping Telegram client:', error);
+            throw error;
+        }
     }
 
     async sendMessage(chatId: string, text: string, options?: any): Promise<any> {
-        return this.bot.telegram.sendMessage(chatId, text, options);
+        try {
+            return await this.bot.telegram.sendMessage(chatId, text, options);
+        } catch (error) {
+            Logger.error(`Error sending message to chat ${chatId}:`, error);
+            throw error;
+        }
     }
 }

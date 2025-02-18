@@ -146,7 +146,7 @@ class HiveSwarm {
             // Start Telegram process
             await this.processManager.startProcess('telegram', './dist/processes/telegram.js', {
                 TELEGRAM_BOT_TOKEN: this.config.telegram?.token,
-                TELEGRAM_GROUP_CHAT_ID: this.config.telegram?.groupChatId,
+                TELEGRAM_GROUP_CHAT_ID: this.config.telegram?.communityChatId,
                 TELEGRAM_FOUNDER_CHAT_ID: this.config.telegram?.founderChatId,
                 REDIS_URL: this.config.redis_url
             });

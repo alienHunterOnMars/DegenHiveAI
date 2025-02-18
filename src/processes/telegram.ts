@@ -6,7 +6,7 @@ export async function startTelegram() {
     try {
         const config = {
             token: process.env.TELEGRAM_BOT_TOKEN!,
-            groupChatId: process.env.TELEGRAM_GROUP_CHAT_ID!,
+            communityChatId: process.env.TELEGRAM_GROUP_CHAT_ID!,
             founderChatId: process.env.TELEGRAM_FOUNDER_CHAT_ID!,
             redis_url: process.env.REDIS_URL!
         };
