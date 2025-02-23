@@ -32,8 +32,8 @@ export class MessageManager {
   // Main entry: process incoming message
   public async handleMessage(ctx: Context, redisClient: RedisClient): Promise<void> {
     try {
-      Logger.info("handleMessage");
-      Logger.info(ctx);
+      // Logger.info("handleMessage");
+      // Logger.info(ctx);
 
       const messageText = ctx.message?.text;
       if (!messageText) return; // ignore non-text messages for now

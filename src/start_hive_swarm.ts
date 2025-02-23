@@ -152,8 +152,8 @@ class HiveSwarm {
             return;
         }
 
-        Logger.info('Config loaded:');
-        Logger.info(this.config);
+        // Logger.info('Config loaded:');
+        // Logger.info(this.config);
 
         // this.plugins = new Map();
     }
@@ -167,6 +167,19 @@ class HiveSwarm {
                 TELEGRAM_BOT_TOKEN: this.config.telegram?.token,
                 TELEGRAM_GROUP_CHAT_ID: this.config.telegram?.communityChatId,
                 TELEGRAM_FOUNDER_CHAT_ID: this.config.telegram?.founderChatId,
+                REDIS_URL: this.config.redis_url
+            });
+
+            // Start email process
+            await this.processManager.startProcess('email', './dist/processes/email.js', {
+                IMAP_HOST: this.config.email?.imap?.host,
+                IMAP_PORT: this.config.email?.imap?.port,
+                IMAP_USER: this.config.email?.imap?.auth?.user,
+                IMAP_PASSWORD: this.config.email?.imap?.auth?.pass,
+                IMAP_TLS: this.config.email?.imap?.tls,
+                SENDGRID_API_KEY: this.config.email?.SENDGRID_API_KEY,
+                SENDGRID_SIGNING_SECRET: this.config.email?.SENDGRID_SIGNING_SECRET,
+                EMAIL_WEBHOOK_PORT: 3001, // Fixed port for webhook server
                 REDIS_URL: this.config.redis_url
             });
 

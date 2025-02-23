@@ -4,17 +4,13 @@ import nodemailer from 'nodemailer';
 import Imap from 'node-imap';
 import { simpleParser } from 'mailparser';
 import { v4 as uuid } from 'uuid';
+import sgMail from '@sendgrid/mail';
+import { WebhookServer } from './webhookServer';
 
 export interface EmailConfig {
-    smtp: {
-        host: string;
-        port: number;
-        secure: boolean;
-        auth: {
-            user: string;
-            pass: string;
-        }
-    };
+    SENDGRID_API_KEY: string;
+    SENDGRID_SIGNING_SECRET: string;
+    WEBHOOK_PORT: number;
     imap: {
         host: string;
         port: number;
@@ -29,20 +25,26 @@ export interface EmailConfig {
 }
 
 export class EmailAdapter extends EventEmitter {
-    private transporter: nodemailer.Transporter;
+    // private transporter: nodemailer.Transporter;
     private imap: Imap;
     private redisClient: RedisClient;
     private readonly config: EmailConfig;
     private checkInterval: NodeJS.Timeout | null = null;
+    private webhookServer: WebhookServer;
 
     constructor(config: EmailConfig) {
         super();
-        this.config = config;
+        Logger.info('=== Initializing EmailAdapter Components ===');
         
-        // Setup SMTP for sending
-        this.transporter = nodemailer.createTransport(config.smtp);
+        this.config = config;
+        Logger.info('Config loaded');
+        Logger.info(this.config);
 
-        // Setup IMAP for receiving
+        Logger.info('Setting up SendGrid...');
+        sgMail.setApiKey(config.SENDGRID_API_KEY);
+        Logger.info('SendGrid configured');
+        
+        Logger.info('Setting up IMAP client...');
         this.imap = new Imap({
             user: config.imap.auth.user,
             password: config.imap.auth.pass,
@@ -51,38 +53,60 @@ export class EmailAdapter extends EventEmitter {
             tls: config.imap.tls,
             tlsOptions: { rejectUnauthorized: false }
         });
+        Logger.info('IMAP client created');
 
-        // Setup Redis client
+        Logger.info('Setting up Redis client...');
         this.redisClient = new RedisClient({ url: config.redis_url });
+        Logger.info('Redis client created');
 
-        // Setup IMAP error handling
+        Logger.info('Setting up webhook server...');
+        this.webhookServer = new WebhookServer({
+            port: config.WEBHOOK_PORT,
+            sendgridSigningSecret: config.SENDGRID_SIGNING_SECRET,
+            redisClient: this.redisClient
+        });
+        Logger.info('Webhook server created');
+
+        Logger.info('Setting up IMAP error handlers...');
         this.imap.on('error', (err: any) => {
             Logger.error('IMAP error:', err);
         });
+        Logger.info('IMAP error handlers set up');
+        
+        Logger.info('=== EmailAdapter Components Initialized ===');
     }
 
     async start(): Promise<void> {
         try {
-            // Subscribe to Redis messages
-            await this.redisClient.subscribe(REDIS_CHANNELS.SOCIAL_OUTBOUND, 
+            Logger.info('=== Starting EmailAdapter Services ===');
+
+            Logger.info('Setting up Redis subscription...');
+            await this.redisClient.subscribe(REDIS_CHANNELS.EMAIL, 
                 async (message: RedisMessage) => {
-                    if (message.source !== 'email') {
+                    if (message.destination === REDIS_CHANNELS.EMAIL) {
                         await this.handleIncomingRedisMessage(message);
                     }
             });
+            Logger.info('Redis subscription established');
 
-            // Start IMAP connection
+            Logger.info('Starting IMAP connection...');
             await this.connectImap();
+            Logger.info('IMAP connection established');
 
-            // Start periodic email checking
-            const interval = this.config.checkInterval || 60000; // default 1 minute
+            Logger.info('Starting webhook server...');
+            await this.webhookServer.start();
+            Logger.info('Webhook server started');
+
+            Logger.info('Setting up email checking interval...');
+            const interval = this.config.checkInterval || 60000;
             this.checkInterval = setInterval(() => {
                 this.checkEmails().catch(err => {
                     Logger.error('Error checking emails:', err);
                 });
             }, interval);
+            Logger.info('Email checking interval set up');
 
-            Logger.info('Email adapter started successfully');
+            Logger.info('=== EmailAdapter Services Started Successfully ===');
         } catch (error) {
             Logger.error('Failed to start email adapter:', error);
             throw error;
@@ -107,10 +131,7 @@ export class EmailAdapter extends EventEmitter {
     private async handleIncomingRedisMessage(message: RedisMessage): Promise<void> {
         try {
             Logger.info("Email Adapter :: handleIncomingRedisMessage", message);
-
-            if (message.type !== 'INTERNAL' || !message.payload) {
-                return;
-            }
+ 
 
             // Handle different types of email messages
             switch (message.payload.type) {
@@ -156,12 +177,12 @@ export class EmailAdapter extends EventEmitter {
                                 }
 
                                 // Publish email to Redis
-                                await this.redisClient.publish(REDIS_CHANNELS.SOCIAL_INBOUND, {
+                                await this.redisClient.publish(REDIS_CHANNELS.INTERNAL, {
                                     id: uuid(),
                                     timestamp: Date.now(),
                                     type: 'INTERNAL',
-                                    destination: 'email',
                                     source: 'email',
+                                    destination: 'hivemind/ceo',
                                     payload: {
                                         type: 'email',
                                         from: parsed.from?.text,
@@ -195,23 +216,63 @@ export class EmailAdapter extends EventEmitter {
             this.checkInterval = null;
         }
         
+        await this.webhookServer.stop();
         await this.redisClient.disconnect();
         this.imap.end();
-        this.transporter.close();
+        // this.transporter.close();
         Logger.info('Email adapter stopped');
     }
 
-    async sendEmail(to: string, subject: string, content: string): Promise<void> {
+    async sendEmail(
+        to: string[], 
+        subject: string, 
+        content: string, 
+        options?: {
+            cc?: string[];
+            bcc?: string[];
+            htmlContent?: string;
+            template_id?: string;
+            attachments?: any[];
+        }
+    ): Promise<void> {
         try {
-            await this.transporter.sendMail({
-                from: this.config.smtp.auth.user,
+            const msg = {
                 to,
+                from: {
+                    email: 'capitaldesk@degenhive.ai',
+                    name: 'DegenHive Capital Desk'  
+                },
                 subject,
-                text: content
+                text: content, // Plain text version
+                html: options?.htmlContent || content, // HTML version (falls back to plain text if not provided)
+                cc: options?.cc,
+                bcc: options?.bcc,
+                template_id: options?.template_id,
+                attachments: options?.attachments,
+            };
+
+            // Implement retry logic
+            let retries = 3;
+            while (retries > 0) {
+                try {
+                    const response = await sgMail.send(msg);
+                    Logger.info(`Email sent successfully to ${to.join(', ')}. Status: ${response[0].statusCode}`);
+                    return;
+                } catch (error: any) {
+                    retries--;
+                    if (retries === 0) throw error;
+                    
+                    // Wait before retrying (exponential backoff)
+                    await new Promise(resolve => setTimeout(resolve, (3 - retries) * 1000));
+                    Logger.warn(`Retrying email send. Attempts remaining: ${retries}`);
+                }
+            }
+        } catch (error: any) {
+            Logger.error('Error sending email:', {
+                error: error.message,
+                recipients: to,
+                subject
             });
-            Logger.info(`Email sent to ${to}`);
-        } catch (error) {
-            Logger.error('Error sending email:', error);
             throw error;
         }
     }

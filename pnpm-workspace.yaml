@@ -3,7 +3,6 @@ packages:
   - 'services/*'
   - 'core'
   - 'utils'
-  - 'messaging' 
   - 'plugins/sui'
   - 'plugins/hyperliquid'
   - 'plugins/trustdb'

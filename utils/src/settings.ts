@@ -38,14 +38,6 @@ export function loadEnvConfig(): Settings {
 // Initialize settings based on environment
 export const settings = loadEnvConfig();
 
-Logger.info("Parsed settings:", {
-    USE_OPENAI_EMBEDDING: settings.USE_OPENAI_EMBEDDING,
-    USE_OPENAI_EMBEDDING_TYPE: typeof settings.USE_OPENAI_EMBEDDING,
-    USE_OLLAMA_EMBEDDING: settings.USE_OLLAMA_EMBEDDING,
-    USE_OLLAMA_EMBEDDING_TYPE: typeof settings.USE_OLLAMA_EMBEDDING,
-    OLLAMA_EMBEDDING_MODEL:
-        settings.OLLAMA_EMBEDDING_MODEL || "mxbai-embed-large",
-});
 
 export default settings;
  

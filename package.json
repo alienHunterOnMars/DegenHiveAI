@@ -39,7 +39,6 @@
         "@hiveai/adapters-reddit": "workspace:*",
         "@hiveai/adapters-telegram": "workspace:*",
         "@hiveai/adapters-twitter": "workspace:*",
-        "@hiveai/messaging": "workspace:*",
         "@hiveai/plugin-hyperliquid": "workspace:*",
         "@hiveai/plugin-solana": "workspace:*",
         "@hiveai/plugin-sui": "workspace:*",

@@ -41,7 +41,8 @@ export const REDIS_CHANNELS = {
   DISCORD: 'DISCORD',
   REDDIT: 'REDDIT',
   FARCASTER: 'FARCASTER',
-  TWITTER: 'TWITTER'
+  TWITTER: 'TWITTER',
+  EMAIL: 'EMAIL'
 };
 
 export class RedisClient extends EventEmitter {
