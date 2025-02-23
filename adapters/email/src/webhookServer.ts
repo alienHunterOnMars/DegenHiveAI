@@ -40,6 +40,7 @@ export class WebhookServer {
                 signatureHeader: signature,
                 timestampHeader: timestamp,
                 receivedHeaders: JSON.stringify(req.headers),
+                rawBody: req.rawBody?.substring(0, 100) + '...' // Log first 100 chars of body
             });
 
             if (!signature || !timestamp) {

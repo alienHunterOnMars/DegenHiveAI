@@ -1,6 +1,5 @@
 import { EventEmitter } from 'events';
 import { Logger, RedisClient, RedisMessage, REDIS_CHANNELS } from '@hiveai/utils';
-import nodemailer from 'nodemailer';
 import Imap from 'node-imap';
 import { simpleParser } from 'mailparser';
 import { v4 as uuid } from 'uuid';
@@ -139,7 +138,8 @@ export class EmailAdapter extends EventEmitter {
                     await this.sendEmail(
                         message.payload.to,
                         message.payload.subject || 'No Subject',
-                        message.payload.content
+                        message.payload.content,
+                        message.payload.options
                     );
                     break;
                 default:
