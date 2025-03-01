@@ -1,0 +1,18 @@
+{
+  "name": "degenhive-testing",
+  "version": "1.0.0",
+  "description": "Testing scripts for DegenHive Reddit functionality",
+  "type": "module",
+  "scripts": {
+    "test:reddit": "node test_reddit.js",
+    "test:reddit:posts": "node test_reddit.js posts",
+    "test:reddit:search": "node test_reddit.js search",
+    "test:reddit:create": "node test_reddit.js create",
+    "test:reddit:comments": "node test_reddit.js comments"
+  },
+  "dependencies": {
+    "snoowrap": "^1.23.0",
+    "dotenv": "^16.0.3",
+    "@hiveai/utils": "file:../packages/utils"
+  }
+} 

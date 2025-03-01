@@ -183,6 +183,20 @@ class HiveSwarm {
                 REDIS_URL: this.config.redis_url
             });
 
+            // Start reddit process
+            await this.processManager.startProcess('reddit', './dist/processes/reddit.js', {
+                REDDIT_USER_AGENT: this.config.reddit?.userAgent,
+                REDDIT_CLIENT_ID: this.config.reddit?.clientId,
+                REDDIT_CLIENT_SECRET: this.config.reddit?.clientSecret,
+                REDDIT_USERNAME: this.config.reddit?.username,
+                REDDIT_PASSWORD: this.config.reddit?.password,
+                REDDIT_REFRESH_TOKEN: this.config.reddit?.refreshToken,
+                REDDIT_MONITORED_SUBREDDITS: this.config.reddit?.monitoredSubreddits,
+                REDDIT_AUTO_REPLY_ENABLED: this.config.reddit?.autoReplyEnabled,
+                REDDIT_POST_APPROVAL_REQUIRED: this.config.reddit?.postApprovalRequired,
+                REDIS_URL: this.config.redis_url
+            });
+
             // Start discord process
             // await this.processManager.startProcess('discord', './dist/processes/discord.js', {
             //     DISCORD_TOKEN: this.config.discord?.token,

@@ -114,16 +114,35 @@ export class EmailAdapter extends EventEmitter {
 
     private connectImap(): Promise<void> {
         return new Promise((resolve, reject) => {
+            let isResolved = false;
+
+            const handleError = (err: any) => {
+                if (!isResolved) {
+                    Logger.error('IMAP connection error:', err);
+                    isResolved = true;
+                    reject(err);
+                }
+            };
+
             this.imap.once('ready', () => {
-                Logger.info('IMAP connection established');
+                Logger.info('IMAP connection ready');
+                isResolved = true;
                 resolve();
             });
 
-            this.imap.once('error', (err: any) => {
-                reject(err);
+            this.imap.once('error', handleError);
+            this.imap.once('end', () => {
+                if (!isResolved) {
+                    handleError(new Error('IMAP connection ended unexpectedly'));
+                }
             });
 
-            this.imap.connect();
+            try {
+                Logger.info('Attempting IMAP connection...');
+                this.imap.connect();
+            } catch (err) {
+                handleError(err);
+            }
         });
     }
 
@@ -151,63 +170,87 @@ export class EmailAdapter extends EventEmitter {
     }
 
     private async checkEmails(): Promise<void> {
-        return new Promise((resolve, reject) => {
-            this.imap.openBox('INBOX', false, (err: any, box: any) => {
-                if (err) return reject(err);
+        try {
+            // Check if IMAP is ready
+            if (!this.imap.state || this.imap.state === 'disconnected') {
+                Logger.warn('IMAP not connected, attempting reconnection...');
+                await this.connectImap();
+            }
 
-                // Search for unread emails
-                this.imap.search(['UNSEEN'], (err: any, results: any) => {
-                    if (err) return reject(err);
-
-                    if (!results.length) {
-                        return resolve();
+            return new Promise((resolve, reject) => {
+                this.imap.openBox('INBOX', false, (err: any, box: any) => {
+                    if (err) {
+                        Logger.error('Error opening INBOX:', err);
+                        return reject(err);
                     }
 
-                    const fetch = this.imap.fetch(results, {
-                        bodies: '',
-                        markSeen: true
-                    });
+                    Logger.info('Successfully opened INBOX');
 
-                    fetch.on('message', (msg: any) => {
-                        msg.on('body', (stream: any) => {
-                            simpleParser(stream, async (err: any, parsed: any) => {
-                                if (err) {
-                                    Logger.error('Error parsing email:', err);
-                                    return;
-                                }
+                    // Search for unread emails
+                    this.imap.search(['UNSEEN'], (err: any, results: any) => {
+                        if (err) {
+                            Logger.error('Error searching for unread emails:', err);
+                            return reject(err);
+                        }
 
-                                // Publish email to Redis
-                                await this.redisClient.publish(REDIS_CHANNELS.INTERNAL, {
-                                    id: uuid(),
-                                    timestamp: Date.now(),
-                                    type: 'INTERNAL',
-                                    source: 'email',
-                                    destination: 'hivemind/ceo',
-                                    payload: {
-                                        type: 'email',
-                                        from: parsed.from?.text,
-                                        subject: parsed.subject,
-                                        content: parsed.text,
-                                        html: parsed.html,
-                                        attachments: parsed.attachments,
-                                        messageId: parsed.messageId
+                        if (!results.length) {
+                            Logger.info('No unread emails found');
+                            return resolve();
+                        }
+
+                        Logger.info(`Found ${results.length} unread email(s)`);
+
+                        const fetch = this.imap.fetch(results, {
+                            bodies: '',
+                            markSeen: true
+                        });
+
+                        fetch.on('message', (msg: any) => {
+                            msg.on('body', (stream: any) => {
+                                simpleParser(stream, async (err: any, parsed: any) => {
+                                    if (err) {
+                                        Logger.error('Error parsing email:', err);
+                                        return;
                                     }
+
+                                    // Publish email to Redis
+                                    await this.redisClient.publish(REDIS_CHANNELS.INTERNAL, {
+                                        id: uuid(),
+                                        timestamp: Date.now(),
+                                        type: 'INTERNAL',
+                                        source: 'email',
+                                        destination: 'hivemind/ceo',
+                                        payload: {
+                                            type: 'email',
+                                            from: parsed.from?.text,
+                                            subject: parsed.subject,
+                                            content: parsed.text,
+                                            html: parsed.html,
+                                            attachments: parsed.attachments,
+                                            messageId: parsed.messageId
+                                        }
+                                    });
+                                    Logger.info('Published email to Redis:', parsed.messageId);
                                 });
-                                Logger.info('Published email to Redis:', parsed.messageId);
                             });
                         });
-                    });
 
-                    fetch.once('error', (err: any) => {
-                        Logger.error('Fetch error:', err);
-                    });
+                        fetch.once('error', (err: any) => {
+                            Logger.error('Fetch error:', err);
+                            reject(err);
+                        });
 
-                    fetch.once('end', () => {
-                        resolve();
+                        fetch.once('end', () => {
+                            Logger.info('Finished fetching all messages');
+                            resolve();
+                        });
                     });
                 });
             });
-        });
+        } catch (error) {
+            Logger.error('Error in checkEmails:', error);
+            throw error;
+        }
     }
 
     async stop(): Promise<void> {
