@@ -27,11 +27,27 @@ interface ServerInfo {
     }[];
 }
 
+// DISCORD CHANNELS
+const CHANNELS = {
+    "1150637896861233194": "alpha",
+    "1273585067746136174": "dragonhive",
+    "1265322447742435539": "protocol",
+    "1150637972874596383": "memes",
+    "alpha": "1150637896861233194",
+    "dragonhive": "1273585067746136174",
+    "protocol": "1265322447742435539",
+    "memes": "1150637972874596383"
+}
+
+
+
 export class DiscordAdapter extends EventEmitter {
 
     private config: DiscordConfig;
     private client: Client;
     private redisClient: RedisClient;
+    private isInitialized: boolean = false;
+    private isShuttingDown: boolean = false;
 
     private announcementHandler: AnnouncementHandler;
     private communityHandler: CommunityHandler;
@@ -61,7 +77,32 @@ export class DiscordAdapter extends EventEmitter {
 
         // Initialize handlers
         this.announcementHandler = new AnnouncementHandler(this.client, config);
-        this.communityHandler = new CommunityHandler(this.client); 
+        this.communityHandler = new CommunityHandler(this.client);
+
+        // Setup process event handlers
+        if (process.send) {
+            process.on('SIGTERM', async () => {
+                await this.stop();
+                process.exit(0);
+            });
+
+            process.on('SIGINT', async () => {
+                await this.stop();
+                process.exit(0);
+            });
+
+            process.on('uncaughtException', async (error) => {
+                Logger.error('Uncaught exception in Discord adapter:', error);
+                await this.stop();
+                process.exit(1);
+            });
+
+            process.on('unhandledRejection', async (error) => {
+                Logger.error('Unhandled rejection in Discord adapter:', error);
+                await this.stop();
+                process.exit(1);
+            });
+        }
     }
 
     private setupEventListeners(): void {
@@ -72,11 +113,12 @@ export class DiscordAdapter extends EventEmitter {
 
         // Handle incoming messages with enhanced logging
         this.client.on(Events.MessageCreate, async (message) => {
-            Logger.info("=== Discord Message Debug ===");
-            Logger.info(`Message received from: ${message.author.tag}`);
-            Logger.info(`Content: ${message.content}`);
-            Logger.info(`Channel: ${message.channel.id}`);
-            Logger.info(`Is bot message: ${message.author.bot}`);
+            // Logger.info("=== Discord Message Debug ===");
+            // Logger.info(`Message received from: ${message.author.tag}`);
+            // Logger.info(`Content: ${message.content}`);
+            // Logger.info(`Channel: ${message.channel.id}`);
+            // Logger.info(`Is bot message: ${message.author.bot}`);
+            console.log(message);
             
             if (message.author.bot) {
                 Logger.info("Skipping bot message");
@@ -107,8 +149,12 @@ export class DiscordAdapter extends EventEmitter {
         Logger.info("Discord event listeners configured successfully");
     }
 
- 
     async start(): Promise<void> {
+        if (this.isInitialized) {
+            Logger.warn("Discord client is already initialized");
+            return;
+        }
+
         try {
             if (this.client.isReady()) {
                 Logger.info("Discord client is already initialized");
@@ -139,16 +185,22 @@ export class DiscordAdapter extends EventEmitter {
             });
 
             // Subscribe to outbound messages from other processes
-            await this.redisClient.subscribe( REDIS_CHANNELS.SOCIAL_OUTBOUND, 
+            await this.redisClient.subscribe(REDIS_CHANNELS.DISCORD, 
                 async (message: RedisMessage) => {
-                if (message.source === 'discord') {
-                    await this.handleIncomingRedisMessage(message);
-                }
-        });  
+                    if (message.destination === 'DISCORD') {
+                        await this.handleIncomingRedisMessage(message);
+                    }
+            });  
 
             this.setupEventListeners();
+            this.isInitialized = true;
 
             Logger.info("Discord adapter initialization complete");
+
+            // Notify parent process that we're ready
+            if (process.send) {
+                process.send({ type: 'ready', service: 'discord' });
+            }
 
         } catch (error) {
             Logger.error("Failed to initialize Discord client:", error);
@@ -163,153 +215,174 @@ export class DiscordAdapter extends EventEmitter {
     async handleIncomingRedisMessage(message: any): Promise<void> {
         Logger.info("Discord Adapter :: handleIncomingRedisMessage");
         Logger.info(message);
+        await this.sendMessage(message.payload.channelId, message.payload.content, message.payload.replyToMessageId )
     }
-
-    async sendMessage(channelId: string, content: string): Promise<void> {
+ 
+    async sendMessage(channelId: string, content: string, replyToMessageId?: string): Promise<void> {
         const channel = await this.client.channels.fetch(channelId);
         if (channel?.isTextBased()) {
-            await channel.send(content);
+            if (replyToMessageId) {
+                try {
+                    const messageToReply = await channel.messages.fetch(replyToMessageId);
+                    await messageToReply.reply(content);
+                } catch (error) {
+                    Logger.warn(`Failed to reply to message ${replyToMessageId}, sending as normal message:`, error);
+                    await channel.send(content);
+                }
+            } else {
+                await channel.send(content);
+            }
         }
     }
+
+
 
     async stop(): Promise<void> {
-        this.client.destroy();
-        await this.redisClient.disconnect();
-        Logger.info("Discord adapter stopped");
-    }
+        if (this.isShuttingDown) {
+            return;
+        }
 
- 
- 
-    async getServers(): Promise<ServerInfo[]> {
+        this.isShuttingDown = true;
+        Logger.info("Stopping Discord adapter...");
+
         try {
-            // Check if client is ready instead of just checking user
-            if (!this.client.isReady()) {
-                await new Promise<void>((resolve) => {
-                    this.client.once(Events.ClientReady, () => resolve());
-                });
-            }
-
-            const servers: ServerInfo[] = [];
-
-            for (const guild of this.client.guilds.cache.values()) {
-                const channels: ServerChannelInfo[] = [];
-
-                // Get channels
-                guild.channels.cache.forEach(channel => {
-                    if (channel.isTextBased()) {
-                        const permissions = channel.permissionsFor(this.client.user!);
-                        channels.push({
-                            id: channel.id,
-                            name: channel.name,
-                            type: channel.type.toString(),
-                            canSendMessages: permissions?.has('SendMessages') ?? false,
-                            canReadMessages: permissions?.has('ViewChannel') ?? false
-                        });
-                    }
-                });
-
-                // Get roles
-                const roles = guild.roles.cache.map(role => ({
-                    id: role.id,
-                    name: role.name,
-                    color: role.hexColor,
-                    position: role.position
-                }));
-
-                servers.push({
-                    id: guild.id,
-                    name: guild.name,
-                    memberCount: guild.memberCount,
-                    ownerId: guild.ownerId,
-                    channels,
-                    roles
-                });
-            }
-
-            return servers;
+            this.client.destroy();
+            await this.redisClient.disconnect();
+            Logger.info("Discord adapter stopped successfully");
         } catch (error) {
-            Logger.error("Error getting servers:", error);
+            Logger.error("Error stopping Discord adapter:", error);
             throw error;
         }
     }
 
-    async getChannels(serverId: string): Promise<ServerChannelInfo[]> {
-        try {
-            const guild = await this.client.guilds.fetch(serverId);
-            if (!guild) {
-                throw new Error(`Server with ID ${serverId} not found`);
-            }
+    // async getServers(): Promise<ServerInfo[]> {
+    //     try {
+    //         // Check if client is ready instead of just checking user
+    //         if (!this.client.isReady()) {
+    //             await new Promise<void>((resolve) => {
+    //                 this.client.once(Events.ClientReady, () => resolve());
+    //             });
+    //         }
 
-            const channels: ServerChannelInfo[] = [];
+    //         const servers: ServerInfo[] = [];
+
+    //         for (const guild of this.client.guilds.cache.values()) {
+    //             const channels: ServerChannelInfo[] = [];
+
+    //             // Get channels
+    //             guild.channels.cache.forEach(channel => {
+    //                 if (channel.isTextBased()) {
+    //                     const permissions = channel.permissionsFor(this.client.user!);
+    //                     channels.push({
+    //                         id: channel.id,
+    //                         name: channel.name,
+    //                         type: channel.type.toString(),
+    //                         canSendMessages: permissions?.has('SendMessages') ?? false,
+    //                         canReadMessages: permissions?.has('ViewChannel') ?? false
+    //                     });
+    //                 }
+    //             });
+
+    //             // Get roles
+    //             const roles = guild.roles.cache.map(role => ({
+    //                 id: role.id,
+    //                 name: role.name,
+    //                 color: role.hexColor,
+    //                 position: role.position
+    //             }));
+
+    //             servers.push({
+    //                 id: guild.id,
+    //                 name: guild.name,
+    //                 memberCount: guild.memberCount,
+    //                 ownerId: guild.ownerId,
+    //                 channels,
+    //                 roles
+    //             });
+    //         }
+
+    //         return servers;
+    //     } catch (error) {
+    //         Logger.error("Error getting servers:", error);
+    //         throw error;
+    //     }
+    // }
+
+    // async getChannels(serverId: string): Promise<ServerChannelInfo[]> {
+    //     try {
+    //         const guild = await this.client.guilds.fetch(serverId);
+    //         if (!guild) {
+    //             throw new Error(`Server with ID ${serverId} not found`);
+    //         }
+
+    //         const channels: ServerChannelInfo[] = [];
             
-            guild.channels.cache.forEach(channel => {
-                if (channel.isTextBased()) {
-                    const permissions = channel.permissionsFor(this.client.user!);
-                    channels.push({
-                        id: channel.id,
-                        name: channel.name,
-                        type: channel.type.toString(),
-                        canSendMessages: permissions?.has('SendMessages') ?? false,
-                        canReadMessages: permissions?.has('ViewChannel') ?? false
-                    });
-                }
-            });
+    //         guild.channels.cache.forEach(channel => {
+    //             if (channel.isTextBased()) {
+    //                 const permissions = channel.permissionsFor(this.client.user!);
+    //                 channels.push({
+    //                     id: channel.id,
+    //                     name: channel.name,
+    //                     type: channel.type.toString(),
+    //                     canSendMessages: permissions?.has('SendMessages') ?? false,
+    //                     canReadMessages: permissions?.has('ViewChannel') ?? false
+    //                 });
+    //             }
+    //         });
 
-            return channels;
-        } catch (error) {
-            Logger.error(`Error getting channels for server ${serverId}:`, error);
-            throw error;
-        }
-    }
+    //         return channels;
+    //     } catch (error) {
+    //         Logger.error(`Error getting channels for server ${serverId}:`, error);
+    //         throw error;
+    //     }
+    // }
 
-
-    async getBotServerInfo(): Promise<void> {
-        try {
-            if (!this.client.user) {
-                Logger.info("Bot is not logged in!");
-                return;
-            }
+    // async getBotServerInfo(): Promise<void> {
+    //     try {
+    //         if (!this.client.user) {
+    //             Logger.info("Bot is not logged in!");
+    //             return;
+    //         }
     
-            // List all servers (guilds)
-            Logger.info("\n=== BOT SERVER INFORMATION ===");
-            Logger.info(`Bot Name: ${this.client.user.tag}`);
-            Logger.info(`Bot ID: ${this.client.user.id}`);
-            Logger.info(`Total Servers: ${this.client.guilds.cache.size}`);
+    //         // List all servers (guilds)
+    //         Logger.info("\n=== BOT SERVER INFORMATION ===");
+    //         Logger.info(`Bot Name: ${this.client.user.tag}`);
+    //         Logger.info(`Bot ID: ${this.client.user.id}`);
+    //         Logger.info(`Total Servers: ${this.client.guilds.cache.size}`);
     
-            // Iterate through each server
-            this.client.guilds.cache.forEach(guild => {
-                Logger.info(`\n📌 SERVER: ${guild.name}`);
-                Logger.info(`   ID: ${guild.id}`);
-                Logger.info(`   Member Count: ${guild.memberCount}`);
-                Logger.info(`   Owner ID: ${guild.ownerId}`);
+    //         // Iterate through each server
+    //         this.client.guilds.cache.forEach(guild => {
+    //             Logger.info(`\n📌 SERVER: ${guild.name}`);
+    //             Logger.info(`   ID: ${guild.id}`);
+    //             Logger.info(`   Member Count: ${guild.memberCount}`);
+    //             Logger.info(`   Owner ID: ${guild.ownerId}`);
                 
-                // List all channels in the server
-                Logger.info("   CHANNELS:");
-                guild.channels.cache.forEach(channel => {
-                    if (channel.isTextBased()) {
-                        Logger.info(`   📝 #${channel.name}`);
-                        Logger.info(`      - ID: ${channel.id}`);
-                        Logger.info(`      - Type: ${channel.type}`);
-                        // Check if bot can send messages in this channel
-                        const permissions = channel.permissionsFor(this.client.user!);
-                        Logger.info(`      - Can Send Messages: ${permissions?.has('SendMessages')}`);
-                        Logger.info(`      - Can Read Messages: ${permissions?.has('ViewChannel')}`);
-                    }
-                });
+    //             // List all channels in the server
+    //             Logger.info("   CHANNELS:");
+    //             guild.channels.cache.forEach(channel => {
+    //                 if (channel.isTextBased()) {
+    //                     Logger.info(`   📝 #${channel.name}`);
+    //                     Logger.info(`      - ID: ${channel.id}`);
+    //                     Logger.info(`      - Type: ${channel.type}`);
+    //                     // Check if bot can send messages in this channel
+    //                     const permissions = channel.permissionsFor(this.client.user!);
+    //                     Logger.info(`      - Can Send Messages: ${permissions?.has('SendMessages')}`);
+    //                     Logger.info(`      - Can Read Messages: ${permissions?.has('ViewChannel')}`);
+    //                 }
+    //             });
     
-                // List roles
-                Logger.info("   ROLES:");
-                guild.roles.cache.forEach(role => {
-                    Logger.info(`   👑 ${role.name}`);
-                    Logger.info(`      - ID: ${role.id}`);
-                    Logger.info(`      - Color: ${role.hexColor}`);
-                    Logger.info(`      - Position: ${role.position}`);
-                });
-            });
+    //             // List roles
+    //             Logger.info("   ROLES:");
+    //             guild.roles.cache.forEach(role => {
+    //                 Logger.info(`   👑 ${role.name}`);
+    //                 Logger.info(`      - ID: ${role.id}`);
+    //                 Logger.info(`      - Color: ${role.hexColor}`);
+    //                 Logger.info(`      - Position: ${role.position}`);
+    //             });
+    //         });
     
-        } catch (error) {
-            Logger.error("Error getting server info:", error);
-        }
-    }
-
+    //     } catch (error) {
+    //         Logger.error("Error getting server info:", error);
+    //     }
+    // }
 } 
