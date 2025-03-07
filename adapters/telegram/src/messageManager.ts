@@ -70,7 +70,7 @@ export class MessageManager {
           timestamp: Date.now(),
           type: 'INTERNAL',
           source: 'telegram',
-          destination: 'hivemind/community',
+          destination: 'hivemind/ceo',
           payload: {  chatId: ctx.chat.id,  text: messageText,  userId: ctx.from?.id,  messageId: ctx.message?.message_id   }
         });
         return;
