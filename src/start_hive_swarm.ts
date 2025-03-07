@@ -18,20 +18,6 @@ import * as fs from 'node:fs';
 import { fork, type ChildProcess } from 'child_process';
 import * as dotenv from 'dotenv';
 import { Logger } from '@hiveai/utils';
-// import { KafkaEventBus } from './infrastructure/KafkaEventBus';
-// import { RedisClient } from './infrastructure/RedisClient';
-// import { ServiceRegistry } from './infrastructure/ServiceRegistry';
-// import { AgentOrchestrator } from './services/agent-orchestrator/AgentOrchestrator';
-// import { MessageOrchestrator } from './services/message-orchestrator/MessageOrchestrator';
-import { RedditAdapter } from '@hiveai/adapters-reddit';
-import { TwitterAdapter } from '@hiveai/adapters-twitter';
-import { FarcasterAdapter } from '@hiveai/adapters-farcaster';
-import { EmailAdapter } from '@hiveai/adapters-email';
-import { solanaPlugin } from '@hiveai/plugin-solana';
-import { suiPlugin } from '@hiveai/plugin-sui';
-// import { hyperliquidPlugin } from '@hiveai/plugin-hyperliquid';
-import { trustDBPlugin } from '@hiveai/plugin-trustdb';
-
 // Initialize dotenv with explicit path resolution
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -162,64 +148,62 @@ class HiveSwarm {
         try {
             Logger.info('Starting HiveAI Swarm...');
 
-            // // Start Telegram process
-            // await this.processManager.startProcess('telegram', './dist/processes/telegram.js', {
-            //     TELEGRAM_BOT_TOKEN: this.config.telegram?.token,
-            //     TELEGRAM_GROUP_CHAT_ID: this.config.telegram?.communityChatId,
-            //     TELEGRAM_FOUNDER_CHAT_ID: this.config.telegram?.founderChatId,
-            //     REDIS_URL: this.config.redis_url
-            // });
+            // Start Telegram process
+            await this.processManager.startProcess('telegram', './dist/processes/telegram.js', {
+                TELEGRAM_BOT_TOKEN: this.config.telegram?.token,
+                TELEGRAM_GROUP_CHAT_ID: this.config.telegram?.communityChatId,
+                TELEGRAM_FOUNDER_CHAT_ID: this.config.telegram?.founderChatId,
+                REDIS_URL: this.config.redis_url
+            });
 
-            // // Start email process
-            // await this.processManager.startProcess('email', './dist/processes/email.js', {
-            //     IMAP_HOST: this.config.email?.imap?.host,
-            //     IMAP_PORT: this.config.email?.imap?.port,
-            //     IMAP_USER: this.config.email?.imap?.auth?.user,
-            //     IMAP_PASSWORD: this.config.email?.imap?.auth?.pass,
-            //     IMAP_TLS: this.config.email?.imap?.tls,
-            //     SENDGRID_API_KEY: this.config.email?.SENDGRID_API_KEY,
-            //     SENDGRID_SIGNING_SECRET: this.config.email?.SENDGRID_SIGNING_SECRET,
-            //     EMAIL_WEBHOOK_PORT: 3001, // Fixed port for webhook server
-            //     REDIS_URL: this.config.redis_url
-            // });
-
-            // // Start reddit process
-            // await this.processManager.startProcess('reddit', './dist/processes/reddit.js', {
-            //     REDDIT_USER_AGENT: this.config.reddit?.userAgent,
-            //     REDDIT_CLIENT_ID: this.config.reddit?.clientId,
-            //     REDDIT_CLIENT_SECRET: this.config.reddit?.clientSecret,
-            //     REDDIT_USERNAME: this.config.reddit?.username,
-            //     REDDIT_PASSWORD: this.config.reddit?.password,
-            //     REDDIT_REFRESH_TOKEN: this.config.reddit?.refreshToken,
-            //     REDDIT_MONITORED_SUBREDDITS: this.config.reddit?.monitoredSubreddits,
-            //     REDDIT_AUTO_REPLY_ENABLED: this.config.reddit?.autoReplyEnabled,
-            //     REDDIT_POST_APPROVAL_REQUIRED: this.config.reddit?.postApprovalRequired,
-            //     REDIS_URL: this.config.redis_url
-            // });
+            // Start email process
+            await this.processManager.startProcess('email', './dist/processes/email.js', {
+                IMAP_HOST: this.config.email?.imap?.host,
+                IMAP_PORT: this.config.email?.imap?.port,
+                IMAP_USER: this.config.email?.imap?.auth?.user,
+                IMAP_PASSWORD: this.config.email?.imap?.auth?.pass,
+                IMAP_TLS: this.config.email?.imap?.tls,
+                SENDGRID_API_KEY: this.config.email?.SENDGRID_API_KEY,
+                SENDGRID_SIGNING_SECRET: this.config.email?.SENDGRID_SIGNING_SECRET,
+                EMAIL_WEBHOOK_PORT: 3001, // Fixed port for webhook server
+                REDIS_URL: this.config.redis_url
+            });
 
             // Start discord process
             await this.processManager.startProcess('discord', './dist/processes/discord.js', {
                 DISCORD_TOKEN: this.config.discord?.token,
+                DISCORD_GUILD_ID: this.config.discord?.guildId,
                 DISCORD_ANNOUNCEMENT_CHANNEL_ID: this.config.discord?.announcementChannelId,
                 DISCORD_ALPHA_CHANNEL_ID: this.config.discord?.alphaChannelId,
                 DISCORD_MEME_CHANNEL_ID: this.config.discord?.memeChannelId,
                 REDIS_URL: this.config.redis_url
             });
- 
 
-            // Start blockchain process
-            // await this.processManager.startProcess('blockchain', './dist/processes/blockchain.js', {
-            //     REDIS_URL: this.config.redis?.url,
-            //     RPC_ENDPOINTS: JSON.stringify(this.config.rpcEndpoints)
+            // Start reddit process
+            await this.processManager.startProcess('reddit', './dist/processes/reddit.js', {
+                REDDIT_USER_AGENT: this.config.reddit?.userAgent,
+                REDDIT_CLIENT_ID: this.config.reddit?.clientId,
+                REDDIT_CLIENT_SECRET: this.config.reddit?.clientSecret,
+                REDDIT_USERNAME: this.config.reddit?.username,
+                REDDIT_PASSWORD: this.config.reddit?.password,
+                REDDIT_REFRESH_TOKEN: this.config.reddit?.refreshToken,
+                REDDIT_MONITORED_SUBREDDITS: this.config.reddit?.monitoredSubreddits?.join(','),
+                REDDIT_AUTO_REPLY_ENABLED: this.config.reddit?.autoReplyEnabled ? 'true' : 'false',
+                REDDIT_POST_APPROVAL_REQUIRED: this.config.reddit?.postApprovalRequired ? 'true' : 'false',
+                REDIS_URL: this.config.redis_url
+            });
+
+            // // Start twitter process
+            // await this.processManager.startProcess('twitter', './dist/processes/twitter.js', {
+            //     TWITTER_API_KEY: this.config.twitter?.apiKey,
+            //     TWITTER_API_SECRET: this.config.twitter?.apiSecret,
+            //     TWITTER_ACCESS_TOKEN: this.config.twitter?.accessToken,
+            //     TWITTER_ACCESS_SECRET: this.config.twitter?.accessTokenSecret,
+            //     TWITTER_BEARER_TOKEN: this.config.twitter?.bearerToken,
+            //     REDIS_URL: this.config.redis_url
             // });
 
             this.setupShutdownHandlers();
-
-            // Initialize plugins first
-            // await this.initializePlugins();
-
-            // Start plugins
-            // await this.startPlugins();
 
             Logger.success('HiveAI Swarm started successfully!');
         } catch (error) {
@@ -227,56 +211,7 @@ class HiveSwarm {
             await this.shutdown(1);
         }
     }
-
-    // private async initializePlugins(): Promise<void> {
-    //     try {
-    //         Logger.info('Initializing plugins...');
-
-    //         // Initialize core plugins
-    //         const corePlugins = [
-    //             // { name: 'solana', plugin: solanaPlugin },
-    //             // { name: 'sui', plugin: suiPlugin },
-    //             // { name: 'hyperliquid', plugin: hyperliquidPlugin },
-    //             { name: 'trustdb', plugin: trustDBPlugin }
-    //         ];
-
-    //         // for (const { name, plugin } of corePlugins) {
-    //         //     if (this.config.plugins.enabled.includes(name)) {
-    //         //         try {
-    //         //             const pluginConfig = this.config.plugins.config[name] || {};
-    //         //             await plugin.init?.(pluginConfig);
-    //         //             this.plugins.set(name, plugin);
-    //         //             Logger.info(`Plugin initialized: ${name}`);
-    //         //         } catch (error) {
-    //         //             Logger.error(`Failed to initialize plugin ${name}:`, error);
-    //         //         }
-    //         //     }
-    //         // }
-    //     } catch (error) {
-    //         Logger.error('Failed to initialize plugins:', error);
-    //         throw error;
-    //     }
-    // }
-
-    // private async startPlugins(): Promise<void> {
-    //     try {
-    //         Logger.info('Starting plugins...');
-
-    //         for (const [name, plugin] of this.plugins.entries()) {
-    //             try {
-    //                 await plugin.start?.();
-    //                 Logger.info(`Plugin started: ${name}`);
-    //             } catch (error) {
-    //                 Logger.error(`Failed to start plugin ${name}:`, error);
-    //             }
-    //         }
-
-    //     } catch (error) {
-    //         Logger.error('Failed to start plugins:', error);
-    //         throw error;
-    //     }
-    // }
-  
+ 
 
     private setupShutdownHandlers(): void {
         const shutdown = async (code: number = 0) => {

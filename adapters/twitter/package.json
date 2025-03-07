@@ -22,6 +22,7 @@
 		"agent-twitter-client": "0.0.18",
 		"events": "^3.3.0",
 		"js-sha1": "^0.7.0",
+		"twitter-api-v2": "^1.20.2",
 		"uuid": "^11.0.5",
 		"zod": "3.23.8"
 	},

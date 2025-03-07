@@ -1,204 +1,392 @@
-import { ClientBase } from "./base";
-import { validateTwitterConfig, type TwitterConfig } from "./environment";
-import { TwitterInteractionClient } from "./interactions";
-import { TwitterPostClient } from "./post";
-import { TwitterSearchClient } from "./search";
-import { TwitterSpaceClient } from "./spaces";
 import { EventEmitter } from 'events';
-import { Logger, REDIS_CHANNELS, RedisClient, RedisMessage } from '@hiveai/utils';
-import { Tweet } from 'agent-twitter-client';
+import { Logger, RedisClient, RedisMessage, REDIS_CHANNELS } from '@hiveai/utils';
 import { v4 as uuid } from 'uuid';
+import {TwitterApi} from 'twitter-api-v2';
+import { TweetHandler } from './handlers/tweetHandler';
+import { TimelineHandler } from './handlers/timelineHandler';
+import { MentionHandler } from './handlers/mentionHandler';
 
-export *  from "./types";
-
-/**
- * A manager that orchestrates all specialized Twitter logic:
- * - client: base operations (login, timeline caching, etc.)
- * - post: autonomous posting logic
- * - search: searching tweets / replying logic
- * - interaction: handling mentions, replies
- * - space: launching and managing Twitter Spaces (optional)
- */
-class TwitterManager {
-    client: ClientBase;
-
-    post: TwitterPostClient;
-    search?: TwitterSearchClient;
-    space?: TwitterSpaceClient;
-    interaction: TwitterInteractionClient;
-    
-    
-    constructor(runtime: any, twitterConfig: TwitterConfig) {
-        // Pass twitterConfig to the base client
-        this.client = new ClientBase(runtime, twitterConfig);
- 
-        // Posting logic
-        this.post = new TwitterPostClient(this.client, runtime);
-
-        // Optional search logic (enabled if TWITTER_SEARCH_ENABLE is true)
-        if (twitterConfig.TWITTER_SEARCH_ENABLE) {
-            Logger.warn("Twitter/X client running in a mode that:");
-            Logger.warn("1. violates consent of random users");
-            Logger.warn("2. burns your rate limit");
-            Logger.warn("3. can get your account banned");
-            Logger.warn("use at your own risk");
-            this.search = new TwitterSearchClient(this.client, runtime);
-        }
-
-        // Mentions and interactions
-        this.interaction = new TwitterInteractionClient(this.client, runtime);
-
-        // Optional Spaces logic (enabled if TWITTER_SPACES_ENABLE is true)
-        if (twitterConfig.TWITTER_SPACES_ENABLE) {
-            this.space = new TwitterSpaceClient(this.client, runtime);
-        }
- 
-    }
+export interface TwitterConfig {
+    apiKey: string;
+    apiSecret: string;
+    accessToken: string;
+    accessSecret: string;
+    bearerToken: string;
+    redis_url: string;
+    autoReplyEnabled?: boolean;
+    monitoredAccounts?: string[];
 }
 
-export const TwitterClientInterface: any = {
-    async start(runtime: any): Promise<TwitterManager> {
-        const twitterConfig: TwitterConfig =
-            await validateTwitterConfig(runtime);
+interface TwitterMention {
+    id: string;
+    text: string;
+    authorId: string;
+    authorUsername: string;
+    createdAt: Date;
+    inReplyToTweetId?: string;
+}
 
-        Logger.log("Twitter client started");
+interface TwitterTweet {
+    id: string;
+    text: string;
+    authorId: string;
+    authorUsername: string;
+    createdAt: Date;
+    metrics?: {
+        retweets: number;
+        replies: number;
+        likes: number;
+        quotes: number;
+    };
+}
 
-        const manager = new TwitterManager(runtime, twitterConfig);
-
-        // Initialize login/session
-        await manager.client.init();
-
-        // Start the posting loop
-        await manager.post.start();
-
-        // Start the search logic if it exists
-        if (manager.search) {
-            await manager.search.start();
-        }
-
-        // Start interactions (mentions, replies)
-        await manager.interaction.start();
-
-        // If Spaces are enabled, start the periodic check
-        if (manager.space) {
-            manager.space.startPeriodicSpaceCheck();
-        }
-
-        return manager;
-    },
-
-    async stop(_runtime: any) {
-        Logger.warn("Twitter client does not support stopping yet");
-    },
-};
-
-export default TwitterClientInterface;
-
-
-/// Twitter Adapter
-/// ==============================
 export class TwitterAdapter extends EventEmitter {
-    private client: TwitterPostClient;
+    private static readonly POLLING_INTERVAL = 60000; // 1 minute
+    private static readonly MENTIONS_INTERVAL = 120000; // 2 minutes
+    private static readonly TIMELINE_INTERVAL = 300000; // 5 minutes
+    private static readonly REQUEST_DELAY = 5000; // 5 seconds between requests
+    private static readonly MAX_TWEETS_PER_REQUEST = 20;
+    private static readonly MAX_MENTIONS_PER_REQUEST = 20;
+
+    private client: TwitterApi;
+    private readOnlyClient: TwitterApi;
     private redisClient: RedisClient;
-    private readonly config: TwitterConfig;
+    private tweetHandler: TweetHandler;
+    private timelineHandler: TimelineHandler;
+    private mentionHandler: MentionHandler;
+    private config: TwitterConfig;
+    private isInitialized: boolean = false;
+    private isShuttingDown: boolean = false;
+    private pollInterval!: NodeJS.Timeout;
+    private mentionsInterval!: NodeJS.Timeout;
+    private timelineInterval!: NodeJS.Timeout;
+    private lastMentionId?: string;
+    private lastTweetId?: string;
 
     constructor(config: TwitterConfig) {
         super();
         this.config = config;
-        this.client = new TwitterPostClient((config as any), null);
-        this.redisClient = new RedisClient({ url: config.REDIS_URL });
-    }
 
-    private async handleMention(tweet: Tweet): Promise<void> {
-        try {
-            await this.redisClient.publish(REDIS_CHANNELS.SOCIAL_INBOUND, {
-                id: uuid(),
-                timestamp: Date.now(),
-                type: 'INTERNAL',
-                destination: 'twitter',
-                source: 'twitter',
-                payload: {
-                    tweetId: tweet.id,
-                    text: tweet.text,
-                    userId: tweet.userId,
-                    username: tweet.username,
-                    inReplyToId: tweet.inReplyToStatusId,
-                    type: 'mention'
-                }
+        console.log(config);
+
+        // Initialize Twitter client with user context (for posting tweets)
+        this.client = new TwitterApi({
+            appKey: config.apiKey,
+            appSecret: config.apiSecret,
+            accessToken: config.accessToken,
+            accessSecret: config.accessSecret
+        } as any);
+
+        // Initialize read-only client with application context (for higher rate limits on reading)
+        this.readOnlyClient = new TwitterApi(config.bearerToken as any);
+
+        // Initialize Redis client
+        this.redisClient = new RedisClient({ url: config.redis_url });
+
+        // Initialize handlers
+        this.tweetHandler = new TweetHandler(this.client);
+        this.timelineHandler = new TimelineHandler(this.readOnlyClient);
+        this.mentionHandler = new MentionHandler(this.client, this.readOnlyClient);
+
+        // Setup process event handlers
+        if (process.send) {
+            process.on('SIGTERM', async () => {
+                await this.stop();
+                process.exit(0);
             });
-            Logger.info('Published mention to Redis:', tweet.id);
-        } catch (error) {
-            Logger.error('Error publishing mention to Redis:', error);
+
+            process.on('SIGINT', async () => {
+                await this.stop();
+                process.exit(0);
+            });
+
+            process.on('uncaughtException', async (error) => {
+                Logger.error('Uncaught exception in Twitter adapter:', error);
+                await this.stop();
+                process.exit(1);
+            });
+
+            process.on('unhandledRejection', async (error) => {
+                Logger.error('Unhandled rejection in Twitter adapter:', error);
+                await this.stop();
+                process.exit(1);
+            });
         }
     }
 
-    private async handleReply(tweet: Tweet): Promise<void> {
+    private async publishToRedis(type: string, payload: any): Promise<void> {
         try {
             await this.redisClient.publish(REDIS_CHANNELS.SOCIAL_INBOUND, {
                 id: uuid(),
                 timestamp: Date.now(),
                 type: 'INTERNAL',
-                destination: 'twitter',
+                destination: 'hivemind/ceo',
                 source: 'twitter',
                 payload: {
-                    tweetId: tweet.id,
-                    text: tweet.text,
-                    userId: tweet.userId,
-                    username: tweet.username,
-                    inReplyToId: tweet.inReplyToStatusId,
-                    type: 'reply'
+                    type,
+                    payload
                 }
             });
-            Logger.info('Published reply to Redis:', tweet.id);
+            Logger.info('TWITTER :: Published to Redis:', { type });
         } catch (error) {
-            Logger.error('Error publishing reply to Redis:', error);
+            Logger.error('Error publishing Twitter data to Redis:', error);
         }
     }
 
     private async handleIncomingRedisMessage(message: RedisMessage): Promise<void> {
         try {
-            Logger.info("Twitter Adapter :: handleIncomingRedisMessage", message);
+            Logger.info("Twitter Adapter :: Received Redis message:", {
+                type: message.type,
+                source: message.source,
+                destination: message.destination,
+                payloadType: message.payload?.type
+            });
 
             if (message.type !== 'INTERNAL' || !message.payload) {
+                Logger.warn('Skipping invalid message format:', { message });
                 return;
             }
 
             switch (message.payload.type) {
                 case 'tweet':
-                    await this.client.sendStandardTweet(message.payload.text, '');
+                    Logger.info('Creating new tweet:', {
+                        text: message.payload.text
+                    });
+                    const tweetResult = await this.tweetHandler.postTweet(message.payload.text);
+                    await this.publishToRedis('tweet_posted', {
+                        id: tweetResult.id,
+                        text: tweetResult.text
+                    });
                     break;
+
                 case 'reply':
-                    if (message.payload.inReplyToId) {
-                        await this.client.sendStandardTweet(message.payload.text, message.payload.inReplyToId);
+                    if (!message.payload.inReplyToTweetId) {
+                        Logger.error('Missing tweet ID to reply to');
+                        return;
                     }
+                    Logger.info('Replying to tweet:', {
+                        inReplyToTweetId: message.payload.inReplyToTweetId,
+                        text: message.payload.text
+                    });
+                    const replyResult = await this.tweetHandler.replyToTweet(
+                        message.payload.inReplyToTweetId,
+                        message.payload.text
+                    );
+                    await this.publishToRedis('reply_posted', {
+                        id: replyResult.id,
+                        inReplyToTweetId: message.payload.inReplyToTweetId,
+                        text: replyResult.text
+                    });
                     break;
+
+                case 'retweet':
+                    if (!message.payload.tweetId) {
+                        Logger.error('Missing tweet ID to retweet');
+                        return;
+                    }
+                    Logger.info('Retweeting tweet:', {
+                        tweetId: message.payload.tweetId
+                    });
+                    const retweetResult = await this.tweetHandler.retweet(message.payload.loggedUserId, message.payload.tweetId);
+                    await this.publishToRedis('retweet_posted', {
+                        id: retweetResult.id,
+                        retweetedId: message.payload.tweetId
+                    });
+                    break;
+
+                case 'get_user_timeline':
+                    if (!message.payload.username) {
+                        Logger.error('Missing username for timeline fetch');
+                        return;
+                    }
+                    Logger.info('Fetching user timeline:', {
+                        username: message.payload.username
+                    });
+                    const timeline = await this.timelineHandler.getUserTimeline(
+                        message.payload.username,
+                        TwitterAdapter.MAX_TWEETS_PER_REQUEST
+                    );
+                    await this.publishToRedis('user_timeline', {
+                        username: message.payload.username,
+                        tweets: timeline
+                    });
+                    break;
+
+                case 'get_tweet':
+                    if (!message.payload.tweetId) {
+                        Logger.error('Missing tweet ID to fetch');
+                        return;
+                    }
+                    Logger.info('Fetching tweet:', {
+                        tweetId: message.payload.tweetId
+                    });
+                    const tweet = await this.timelineHandler.getTweet(message.payload.tweetId);
+                    await this.publishToRedis('tweet_details', tweet);
+                    break;
+
+                case 'search_tweets':
+                    if (!message.payload.query) {
+                        Logger.error('Missing query for tweet search');
+                        return;
+                    }
+                    Logger.info('Searching tweets:', {
+                        query: message.payload.query
+                    });
+                    const searchResults = await this.timelineHandler.searchTweets(
+                        message.payload.query,
+                        TwitterAdapter.MAX_TWEETS_PER_REQUEST
+                    );
+                    await this.publishToRedis('search_results', {
+                        query: message.payload.query,
+                        tweets: searchResults
+                    });
+                    break;
+
                 default:
-                    Logger.warn('Unknown message type:', message.payload.type);
+                    Logger.warn('Unknown payload type:', message.payload.type);
             }
         } catch (error) {
             Logger.error('Error handling Redis message:', error);
         }
     }
 
-    async start(): Promise<void> {
+    private async pollForMentions(): Promise<void> {
         try {
-            await this.client.start();
+            Logger.info('Polling for new mentions...');
+            const mentions = await this.mentionHandler.getRecentMentions(
+                TwitterAdapter.MAX_MENTIONS_PER_REQUEST,
+                this.lastMentionId
+            );
 
-            // Subscribe to outbound messages from other processes
+            if (mentions.length > 0) {
+                Logger.info(`Found ${mentions.length} new mentions`);
+                
+                // Update last mention ID for next poll
+                this.lastMentionId = mentions[0].id;
+                
+                // Process mentions from oldest to newest
+                for (const mention of mentions.reverse()) {
+                    await this.publishToRedis('mention', mention);
+                    
+                    // Auto-reply if enabled
+                    if (this.config.autoReplyEnabled) {
+                        await this.processMention(mention);
+                    }
+                    
+                    // Add delay between processing mentions to avoid rate limits
+                    await new Promise(resolve => setTimeout(resolve, TwitterAdapter.REQUEST_DELAY));
+                }
+            } else {
+                Logger.info('No new mentions found');
+            }
+        } catch (error) {
+            Logger.error('Error polling for mentions:', error);
+        }
+    }
+
+    private async pollMonitoredAccounts(): Promise<void> {
+        if (!this.config.monitoredAccounts || this.config.monitoredAccounts.length === 0) {
+            return;
+        }
+
+        try {
+            Logger.info('Polling monitored accounts for new tweets...');
+            
+            for (const username of this.config.monitoredAccounts) {
+                Logger.info(`Checking for new tweets from ${username}...`);
+                
+                const tweets = await this.timelineHandler.getUserTimeline(
+                    username,
+                    5,
+                    this.lastTweetId
+                );
+                
+                if (tweets.length > 0) {
+                    Logger.info(`Found ${tweets.length} new tweets from ${username}`);
+                    
+                    // Update last tweet ID
+                    if (!this.lastTweetId || tweets[0].id > this.lastTweetId) {
+                        this.lastTweetId = tweets[0].id;
+                    }
+                    
+                    // Process tweets from oldest to newest
+                    for (const tweet of tweets.reverse()) {
+                        await this.publishToRedis('monitored_tweet', tweet);
+                    }
+                } else {
+                    Logger.info(`No new tweets from ${username}`);
+                }
+                
+                // Add delay between checking accounts to avoid rate limits
+                await new Promise(resolve => setTimeout(resolve, TwitterAdapter.REQUEST_DELAY));
+            }
+        } catch (error) {
+            Logger.error('Error polling monitored accounts:', error);
+        }
+    }
+
+    private async processMention(mention: TwitterMention): Promise<void> {
+        try {
+            // Simple auto-reply example - this would be more sophisticated in a real implementation
+            const replyText = `Thanks for mentioning us, @${mention.authorUsername}! We'll get back to you soon.`;
+            
+            const reply = await this.tweetHandler.replyToTweet(mention.id, replyText);
+            
+            Logger.info('Auto-replied to mention:', {
+                mentionId: mention.id,
+                replyId: reply.id
+            });
+            
+            await this.publishToRedis('auto_reply', {
+                mentionId: mention.id,
+                replyId: reply.id,
+                text: replyText
+            });
+        } catch (error) {
+            Logger.error('Error processing mention:', error);
+        }
+    }
+
+    async start(): Promise<void> {
+        if (this.isInitialized) {
+            Logger.warn('Twitter adapter already initialized');
+            return;
+        }
+
+        try {
+            // Verify credentials
+            const currentUser : any = await this.client.v2.me();
+            Logger.info(`Twitter bot logged in as @${currentUser.screen_name}`);
+
+            // Subscribe to Redis messages
             await this.redisClient.subscribe(REDIS_CHANNELS.SOCIAL_OUTBOUND, 
                 async (message: RedisMessage) => {
-                    if (message.source !== 'twitter') {
+                    if (message.destination === 'twitter') {
                         await this.handleIncomingRedisMessage(message);
                     }
             });
 
-            // Set up event listeners for Twitter events
-            if (this.client instanceof EventEmitter) {
-                this.client.on('mention', (tweet: Tweet) => this.handleMention(tweet));
-                this.client.on('reply', (tweet: Tweet) => this.handleReply(tweet));
+            // Start polling for mentions
+            this.mentionsInterval = setInterval(
+                () => this.pollForMentions(),
+                TwitterAdapter.MENTIONS_INTERVAL
+            );
+
+            // Start polling monitored accounts
+            if (this.config.monitoredAccounts && this.config.monitoredAccounts.length > 0) {
+                this.timelineInterval = setInterval(
+                    () => this.pollMonitoredAccounts(),
+                    TwitterAdapter.TIMELINE_INTERVAL
+                );
             }
 
+            this.isInitialized = true;
             Logger.info('Twitter adapter started successfully');
+
+            // Notify parent process that we're ready
+            if (process.send) {
+                process.send({ type: 'ready', service: 'twitter' });
+            }
         } catch (error) {
             Logger.error('Failed to start Twitter adapter:', error);
             throw error;
@@ -206,10 +394,31 @@ export class TwitterAdapter extends EventEmitter {
     }
 
     async stop(): Promise<void> {
+        if (this.isShuttingDown) {
+            return;
+        }
+
+        this.isShuttingDown = true;
+        Logger.info('Stopping Twitter adapter...');
+
         try {
-            await this.client.stop();
+            // Clear intervals
+            if (this.mentionsInterval) {
+                clearInterval(this.mentionsInterval);
+            }
+            
+            if (this.timelineInterval) {
+                clearInterval(this.timelineInterval);
+            }
+            
+            if (this.pollInterval) {
+                clearInterval(this.pollInterval);
+            }
+
+            // Disconnect from Redis
             await this.redisClient.disconnect();
-            Logger.info('Twitter adapter stopped');
+            
+            Logger.info('Twitter adapter stopped successfully');
         } catch (error) {
             Logger.error('Error stopping Twitter adapter:', error);
             throw error;
