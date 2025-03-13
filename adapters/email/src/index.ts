@@ -30,6 +30,7 @@ export class EmailAdapter extends EventEmitter {
     private readonly config: EmailConfig;
     private checkInterval: NodeJS.Timeout | null = null;
     private webhookServer: WebhookServer;
+    private isImapReady: boolean = false;
 
     constructor(config: EmailConfig) {
         super();
@@ -148,7 +149,7 @@ export class EmailAdapter extends EventEmitter {
 
     private async handleIncomingRedisMessage(message: RedisMessage): Promise<void> {
         try {
-            Logger.info("Email Adapter :: handleIncomingRedisMessage", message);
+            Logger.info("Email Adapter :: handleIncomingRedisMessage");
  
 
             // Handle different types of email messages
@@ -266,6 +267,85 @@ export class EmailAdapter extends EventEmitter {
         Logger.info('Email adapter stopped');
     }
 
+    private async ensureImapConnection(): Promise<void> {
+        if (!this.imap.state || this.imap.state === 'disconnected') {
+            Logger.warn('IMAP not connected, attempting reconnection...');
+            await this.connectImap();
+        }
+    }
+
+    private createEmailContent(msg: any): Buffer {
+            // Create a plain text version by stripping HTML
+            const plainText = msg.text.replace(/<[^>]+>/g, '')
+                .replace(/&nbsp;/g, ' ')
+            .replace(/\n\s*\n/g, '\n\n')
+            .trim();
+
+        // Generate a unique boundary
+        const boundary = `----=_Part_${Math.random().toString(36).substr(2)}`;
+
+        // Create email content with proper CRLF line endings
+        const emailContent = [
+            `From: ${msg.from.name} <${msg.from.email}>`,
+            `To: ${msg.to.join(', ')}`,
+            msg.cc ? `Cc: ${msg.cc.join(', ')}` : '',
+            `Subject: ${msg.subject}`,
+            `Date: ${new Date().toUTCString()}`,
+            `Message-ID: <${uuid()}@degenhive.ai>`,
+            'MIME-Version: 1.0',
+            `Content-Type: multipart/alternative; boundary="${boundary}"`,
+            '',
+            'This is a multi-part message in MIME format.',
+            '',
+            `--${boundary}`,
+            'Content-Type: text/plain; charset=UTF-8',
+            'Content-Transfer-Encoding: base64',
+            '',
+            Buffer.from(plainText).toString('base64'),
+            '',
+            `--${boundary}`,
+            'Content-Type: text/html; charset=UTF-8',
+            'Content-Transfer-Encoding: base64',
+            '',
+            Buffer.from(msg.html).toString('base64'),
+            '',
+            `--${boundary}--`,
+            '' // Final newline
+        ].filter(Boolean).join('\r\n');
+
+        // Convert to Buffer with proper line endings
+        return Buffer.from(emailContent, 'utf-8');
+    }
+
+    private appendToSentMail(emailContent: Buffer): Promise<void> {
+        return new Promise((resolve, reject) => {
+            // First, open the Sent Mail box
+            this.imap.openBox('[Gmail]/Sent Mail', false, (boxErr: any) => {
+                if (boxErr) {
+                    Logger.error('Error opening Sent Mail box:', boxErr);
+                    return reject(boxErr);
+                }
+    
+                // Then append the email with properly formatted options
+                const options = {
+                    mailbox: '[Gmail]/Sent Mail',
+                    flags: ['\\Seen']
+                    // Removed the date option as it's causing issues
+                };
+    
+                this.imap.append(emailContent, options, (appendErr: any) => {
+                    if (appendErr) {
+                        Logger.error('Error appending to Sent Mail:', appendErr);
+                        reject(appendErr);
+                    } else {
+                        Logger.info('Email saved to Sent Mail folder');
+                        resolve();
+                    }
+                });
+            });
+        });
+    }
+
     async sendEmail(
         to: string[], 
         subject: string, 
@@ -280,34 +360,49 @@ export class EmailAdapter extends EventEmitter {
     ): Promise<void> {
         try {
             const msg = {
-                to,
+                to: ["rahul@degenhive.ai"],
                 from: {
                     email: 'capitaldesk@degenhive.ai',
-                    name: 'DegenHive Capital Desk'  
+                    name: 'Rahul, Founder @DegenHive'  
                 },
                 subject,
-                text: content, // Plain text version
-                html: options?.htmlContent || content, // HTML version (falls back to plain text if not provided)
+                text: content,
+                html: options?.htmlContent || content,
                 cc: options?.cc,
-                bcc: options?.bcc,
+                bcc: ["rahulmittal4233@gmail.com"],
                 template_id: options?.template_id,
                 attachments: options?.attachments,
             };
 
-            // Implement retry logic
+            // First, try to send via SendGrid with retries
             let retries = 3;
+            let sendgridResponse;
+            
             while (retries > 0) {
                 try {
-                    const response = await sgMail.send(msg);
-                    Logger.info(`Email sent successfully to ${to.join(', ')}. Status: ${response[0].statusCode}`);
-                    return;
+                    sendgridResponse = await sgMail.send(msg);
+                    Logger.info(`Email sent successfully to ${to.join(', ')}. Status: ${sendgridResponse[0].statusCode}`);
+                    break; // Exit loop if successful
                 } catch (error: any) {
                     retries--;
                     if (retries === 0) throw error;
-                    
-                    // Wait before retrying (exponential backoff)
                     await new Promise(resolve => setTimeout(resolve, (3 - retries) * 1000));
-                    Logger.warn(`Retrying email send. Attempts remaining: ${retries}`);
+                    Logger.warn(`Retrying SendGrid send. Attempts remaining: ${retries}`);
+                }
+            }
+
+            // Only try to save to Sent folder if SendGrid was successful
+            if (sendgridResponse) {
+                try {
+                    await this.ensureImapConnection();
+                    
+                    // Use the new createEmailContent method
+                    const emailContent = this.createEmailContent(msg);
+                    
+                    await this.appendToSentMail(emailContent);
+                    Logger.info(`Email saved to Sent Mail folder for ${msg.to.join(', ')}`);
+                } catch (error: any) {
+                    Logger.error('Failed to save email to Sent folder:', error);
                 }
             }
         } catch (error: any) {

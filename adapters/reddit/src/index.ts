@@ -7,6 +7,56 @@ import { RedditMessageHandler } from './handlers/messageHandler';
 import { RedditPostHandler } from './handlers/postHandler';
 import { RedditConfig, RedditPost } from './types';
 
+interface RedditComment {
+    id: string;
+    author: { name: string } | null;
+    body: string;
+    created_utc: number;
+    score: number;
+    replies?: RedditComment[];
+}
+
+interface RedditPostWithComments {
+    title: string;
+    author: string;
+    created: string;
+    url: string;
+    ups: number;
+    downs: number;
+    score: number;
+    comments: number;
+    subreddit_subscribers: number;
+    num_comments: number;
+    selftext: string;
+    commentsList: Array<{
+        author: string;
+        body: string;
+        score: number;
+        replies: Array<{
+            author: string;
+            body: string;
+            score: number;
+        }>;
+    }>;
+}
+
+interface ExpandedPostData {
+    comments: Array<{
+        id: string;
+        author: { name: string } | null;
+        body: string;
+        created_utc: number;
+        score: number;
+        replies?: Array<{
+            id: string;
+            author: { name: string } | null;
+            body: string;
+            created_utc: number;
+            score: number;
+        }>;
+    }>;
+}
+
 export class RedditAdapter extends EventEmitter {
     private static readonly POLLING_INTERVAL = 60000; // 1 minute
     private static readonly SUBREDDIT_MONITOR_INTERVAL = 900000; // 15 minutes
@@ -87,7 +137,7 @@ export class RedditAdapter extends EventEmitter {
  
     private async publishToRedis(type: string, payload: any): Promise<void> {
         try {
-            await this.redisClient.publish(REDIS_CHANNELS.SOCIAL_INBOUND, {
+            await this.redisClient.publish(REDIS_CHANNELS.INTERNAL, {
                 id: uuid(),
                 timestamp: Date.now(),
                 type: 'INTERNAL',
@@ -114,26 +164,26 @@ export class RedditAdapter extends EventEmitter {
                 payloadType: message.payload?.type
             });
 
-            if (message.type !== 'INTERNAL' || !message.payload) {
+            if (message.type !== 'REDDIT' || !message.payload) {
                 Logger.warn('Skipping invalid message format:', { message });
                 return;
             }
 
             switch (message.payload.type) {
-                case 'post':
-                    Logger.info('Creating new Reddit post:', {
-                        subreddit: message.payload.subreddit,
-                        title: message.payload.title
-                    });
-                    await this.postHandler.submitPost({
-                        subreddit: message.payload.subreddit,
-                        title: message.payload.title || 'New Post',
-                        content: message.payload.text,
-                        type: 'text'
-                    });
-                    Logger.info('Successfully created Reddit post');
-                    await this.publishToRedis('post', "SUCCESS");
-                    break;
+                // case 'post':
+                //     Logger.info('Creating new Reddit post:', {
+                //         subreddit: message.payload.subreddit,
+                //         title: message.payload.title
+                //     });
+                //     await this.postHandler.submitPost({
+                //         subreddit: message.payload.subreddit,
+                //         title: message.payload.title || 'New Post',
+                //         content: message.payload.text,
+                //         type: 'text'
+                //     });
+                //     Logger.info('Successfully created Reddit post');
+                //     await this.publishToRedis('post', "SUCCESS");
+                //     break;
 
 
                 case 'fetch_posts':
@@ -161,43 +211,55 @@ export class RedditAdapter extends EventEmitter {
         }
     }
 
+    private async processPost(post: Submission): Promise<RedditPostWithComments> {
+        // Get comments directly from the post
+        const comments = await post.comments.fetchAll();
+        
+        const formattedComments = comments.map((comment: any) => ({
+            author: comment.author ? comment.author.name : '[deleted]',
+            body: comment.body,
+            score: comment.score,
+            replies: comment.replies ? comment.replies.map((reply: Comment) => ({
+                author: reply.author ? reply.author.name : '[deleted]',
+                body: reply.body,
+                score: reply.score
+            })) : []
+        }));
+        
+        return {
+            title: post.title,
+            author: post.author.name,
+            created: new Date(post.created_utc * 1000).toISOString(),
+            url: post.url,
+            ups: post.ups,
+            downs: post.downs,
+            score: post.score,
+            comments: post.num_comments,
+            subreddit_subscribers: post.subreddit_subscribers,
+            num_comments: post.num_comments,
+            selftext: post.selftext,
+            commentsList: formattedComments
+        };
+    }
 
     private async testGetSubredditPosts(subredditName: string) {
         try {
             Logger.info(`Fetching posts from r/${subredditName}...`);
             const subreddit = this.client.getSubreddit(subredditName);
             
-            // Get new posts
-            Logger.info('Fetching new posts...');
             const newPosts = await subreddit.getNew({ limit: 5 });
-            console.log(newPosts);
-            Logger.info('New posts:', newPosts.map(post => ({
-                title: post.title,
-                author: post.author.name,
-                created: new Date(post.created_utc * 1000).toISOString(),
-                url: post.url
-            })));
-    
-            // Get hot posts
-            Logger.info('Fetching hot posts...');
-            const hotPosts = await subreddit.getHot({ limit: 5 });
-            Logger.info('Hot posts:', hotPosts.map(post => ({
-                title: post.title,
-                author: post.author.name,
-                score: post.score,
-                url: post.url
-            })));
 
-            return {
-                newPosts,
-                hotPosts
-            };
+            console
+
+            const postsWithComments = await Promise.all(newPosts.map(post => this.processPost(post)));
+
+            Logger.info('Posts with comments:', postsWithComments);
+            return postsWithComments ;
     
         } catch (error) {
             Logger.error('Error fetching subreddit posts:', error);
         }
     }
-
 
     async start(): Promise<void> {
         if (this.isInitialized) {
@@ -207,7 +269,7 @@ export class RedditAdapter extends EventEmitter {
 
         try {
             // Subscribe to Redis messages
-            await this.redisClient.subscribe(REDIS_CHANNELS.SOCIAL_OUTBOUND, 
+            await this.redisClient.subscribe(REDIS_CHANNELS.REDDIT, 
                 async (message: RedisMessage) => {
                     if (message.source !== 'reddit') {
                         await this.handleIncomingRedisMessage(message);

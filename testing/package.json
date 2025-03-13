@@ -11,8 +11,11 @@
     "test:reddit:comments": "node test_reddit.js comments"
   },
   "dependencies": {
-    "snoowrap": "^1.23.0",
+    "@hiveai/utils": "file:../packages/utils",
     "dotenv": "^16.0.3",
-    "@hiveai/utils": "file:../packages/utils"
+    "imapflow": "^1.0.184",
+    "node-imap": "^0.9.6",
+    "snoowrap": "^1.23.0",
+    "uuid": "^11.1.0"
   }
-} 
+}

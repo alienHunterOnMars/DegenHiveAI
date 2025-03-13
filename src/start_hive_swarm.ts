@@ -157,17 +157,17 @@ class HiveSwarm {
             });
 
             // Start email process
-            await this.processManager.startProcess('email', './dist/processes/email.js', {
-                IMAP_HOST: this.config.email?.imap?.host,
-                IMAP_PORT: this.config.email?.imap?.port,
-                IMAP_USER: this.config.email?.imap?.auth?.user,
-                IMAP_PASSWORD: this.config.email?.imap?.auth?.pass,
-                IMAP_TLS: this.config.email?.imap?.tls,
-                SENDGRID_API_KEY: this.config.email?.SENDGRID_API_KEY,
-                SENDGRID_SIGNING_SECRET: this.config.email?.SENDGRID_SIGNING_SECRET,
-                EMAIL_WEBHOOK_PORT: 3001, // Fixed port for webhook server
-                REDIS_URL: this.config.redis_url
-            });
+            // await this.processManager.startProcess('email', './dist/processes/email.js', {
+            //     IMAP_HOST: this.config.email?.imap?.host,
+            //     IMAP_PORT: this.config.email?.imap?.port,
+            //     IMAP_USER: this.config.email?.imap?.auth?.user,
+            //     IMAP_PASSWORD: this.config.email?.imap?.auth?.pass,
+            //     IMAP_TLS: this.config.email?.imap?.tls,
+            //     SENDGRID_API_KEY: this.config.email?.SENDGRID_API_KEY,
+            //     SENDGRID_SIGNING_SECRET: this.config.email?.SENDGRID_SIGNING_SECRET,
+            //     EMAIL_WEBHOOK_PORT: 3001, // Fixed port for webhook server
+            //     REDIS_URL: this.config.redis_url
+            // });
 
             // Start discord process
             await this.processManager.startProcess('discord', './dist/processes/discord.js', {

@@ -131,13 +131,17 @@ export class TelegramClient {
             Logger.info('Setting up Redis subscription...');
             await this.redisClient.subscribe(REDIS_CHANNELS.TELEGRAM, async (message: RedisMessage) => {
                 try {
-                    Logger.info(`Received message on TELEGRAM channel:`, message);
+                    console.log(`Received message on TELEGRAM channel:`);
+                    console.log(message);
+                    console.log("--------------------------------");
 
                     if (message.destination === REDIS_CHANNELS.TELEGRAM && message.payload) {
-                        const { chatId, text, emailApproval, approvalId } = message.payload;
-                        
+                        const { chatId, text, emailApproval, approvalId, options } = message.payload;
+                        Logger.info(`Received message on TELEGRAM channel:`, message);
+                        console.log(options);
+                        console.log("--------------------------------");
                         if (chatId && text && !emailApproval) {
-                            await this.sendMessage(chatId, text);
+                            await this.sendMessage(chatId, text, options);
                             Logger.info(`Sent message to Telegram chat ${chatId}`);
                         }
                         // We need to request an email approval from the FOUNDER CHAT
